@@ -31,5 +31,8 @@ go.work.sum
 # .idea/
 # .vscode/
 
+# shortcut
+*.lnk
+
 # generated files
 flush/
