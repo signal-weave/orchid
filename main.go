@@ -9,7 +9,10 @@ import (
 )
 
 func main() {
-	system.Startup()
+	err := system.Startup()
+	if err != nil {
+		fmt.Println(err.Error())
+	}
 
 	test()
 }
