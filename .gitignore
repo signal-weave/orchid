@@ -35,5 +35,4 @@ go.work.sum
 *.lnk
 
 # generated files
-flush/
-sstables/
+orchid_tables/
