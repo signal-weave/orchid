@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"os"
 
-	"orchiddb/tables"
+	"orchiddb/globals"
 )
 
 // -------Example Manifest File-------------------------------------------------
@@ -49,7 +49,7 @@ type Manifest struct {
 // LoadManifest reads a JSON manifest file from disk for table and returns a
 // Manifest.
 func LoadManifest(table string) (*Manifest, error) {
-	path := tables.GetMainfestFilepath(table)
+	path := globals.GetMainfestFilepath(table)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err

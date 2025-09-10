@@ -8,9 +8,9 @@ import (
 
 	"orchiddb/consolidate"
 	"orchiddb/globals"
-	"orchiddb/inmem"
 	"orchiddb/manifest"
 	"orchiddb/system"
+	"orchiddb/tables"
 )
 
 var majorVersion int = 0 // Proud version
@@ -33,7 +33,7 @@ func main() {
 func test() {
 	globals.FlushThreshold = 3 // testing
 
-	store := inmem.NewMemTable("test_table", globals.FlushThreshold)
+	store := tables.NewMemTable("test_table", globals.FlushThreshold)
 
 	store.Set("a", "1")
 	store.Set("b", "2")

@@ -1,16 +1,14 @@
-package tables
+package globals
 
 import (
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-
-	"orchiddb/globals"
 )
 
 func GetTableDir(table string) string {
-	return filepath.Join(globals.TablesDir, table)
+	return filepath.Join(TablesDir, table)
 }
 
 func GetFlushDir(table string) string {
@@ -26,7 +24,7 @@ func GetWALDir(table string) string {
 }
 
 func GetMainfestFilepath(table string) string {
-	return filepath.Join(GetSSTableDir(table), globals.MANIFEST_FILE)
+	return filepath.Join(GetSSTableDir(table), MANIFEST_FILE)
 }
 
 func CreateDirsAndFiles(table string) error {

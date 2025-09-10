@@ -1,4 +1,4 @@
-package tables
+package globals
 
 // all ascii supported characters an OrchidDB key can start with.
 var defaultTables []string = []string{

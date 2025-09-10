@@ -1,4 +1,4 @@
-package inmem
+package tables
 
 import (
 	"encoding/json"
@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"orchiddb/globals"
-	"orchiddb/tables"
 )
 
 // The MemTable is the in-memory table that data is retrieved from first.
@@ -34,7 +33,7 @@ type MemTable struct {
 // Will create all sub-directories and default associated files.
 // Returns nil if dirs/files could not be created.
 func NewMemTable(name string, threshold int) *MemTable {
-	if err := tables.CreateDirsAndFiles(name); err != nil {
+	if err := globals.CreateDirsAndFiles(name); err != nil {
 		fmt.Println("error creating table directories: %w", err)
 		return nil
 	}
@@ -75,7 +74,7 @@ func (kv *MemTable) flushToDisk() {
 	date := time.Now().Format(globals.DATE_LAYOUT)
 	time := time.Now().Format(globals.TIME_LAYOUT)
 	filename := fmt.Sprintf("sstable-%s-%s.json", date, time)
-	fp := filepath.Join(tables.GetFlushDir(kv.name), filename)
+	fp := filepath.Join(globals.GetFlushDir(kv.name), filename)
 
 	file, err := os.Create(fp)
 	if err != nil {
