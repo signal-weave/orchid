@@ -30,8 +30,14 @@ func GetExecDirectory() string {
 // The directory the .exe file is ran rome.
 var ExeDir = GetExecDirectory()
 
+// The directory for holding table data.
+var TablesDir = filepath.Join(ExeDir, "orchid_tables")
+
 // The directory the inmem table is flushed to.
 var FlushDir = filepath.Join(ExeDir, "flush")
 
 // The sstables direcotry where persistent data is stored.
 var SSTableDir = filepath.Join(ExeDir, "sstables")
+
+// The manifest file that tracks values ranges in the sstables.
+var ManifestFile = filepath.Join(SSTableDir, "_manifest.json")

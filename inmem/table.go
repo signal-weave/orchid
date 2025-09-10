@@ -3,23 +3,44 @@ package inmem
 import (
 	"encoding/json"
 	"fmt"
-	"orchiddb/globals"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
+
+	"orchiddb/globals"
+	"orchiddb/tables"
 )
 
-type KVStore struct {
+// The MemTable is the in-memory table that data is retrieved from first.
+// If data cannot be found, the disk tables are queried and the result is loaded
+// into the Memtable for caching.
+//
+// MemTable will periodlically flush its data to a temporary disk table. This
+// temp table will have its data moved into the primary tables and the MemTable
+// cache will begin to reload.
+// This keeps the MemTable loaded with only recently queried data, or 'hot'
+// data, and ensures that updates are written to disk for MemTable
+// reconstruction in the event of a crash or power loss.
+type MemTable struct {
+	name      string
 	mutex     sync.Mutex
 	memtable  map[string]string
 	threshold int
 	fileCount int
 }
 
-// NewKVStore creates a new key-value store with the given threshold.
-func NewKVStore(threshold int) *KVStore {
-	return &KVStore{
+// NewMemTable creates a new key-value store with the given threshold and name.
+// Will create all sub-directories and default associated files.
+// Returns nil if dirs/files could not be created.
+func NewMemTable(name string, threshold int) *MemTable {
+	if err := tables.CreateDirsAndFiles(name); err != nil {
+		fmt.Println("error creating table directories: %w", err)
+		return nil
+	}
+
+	return &MemTable{
+		name:      name,
 		memtable:  make(map[string]string),
 		threshold: threshold,
 		fileCount: 0,
@@ -27,7 +48,7 @@ func NewKVStore(threshold int) *KVStore {
 }
 
 // Set inserts or updates a key in the store.
-func (kv *KVStore) Set(key, value string) {
+func (kv *MemTable) Set(key, value string) {
 	kv.mutex.Lock()
 	defer kv.mutex.Unlock()
 
@@ -39,20 +60,22 @@ func (kv *KVStore) Set(key, value string) {
 }
 
 // Get retrieves a value from the store.
-func (kv *KVStore) Get(key string) (string, bool) {
+func (kv *MemTable) Get(key string) (string, bool) {
 	kv.mutex.Lock()
 	defer kv.mutex.Unlock()
 
-	val, ok := kv.memtable[key]
-	return val, ok
+	val, exists := kv.memtable[key]
+	// TODO: If !exists -> Get from sstables.
+
+	return val, exists
 }
 
 // flushToDisk writes the current memtable to disk and clears it.
-func (kv *KVStore) flushToDisk() {
+func (kv *MemTable) flushToDisk() {
 	date := time.Now().Format(globals.DATE_LAYOUT)
 	time := time.Now().Format(globals.TIME_LAYOUT)
 	filename := fmt.Sprintf("sstable-%s-%s.json", date, time)
-	fp := filepath.Join(globals.FlushDir, filename)
+	fp := filepath.Join(tables.GetFlushDir(kv.name), filename)
 
 	file, err := os.Create(fp)
 	if err != nil {
