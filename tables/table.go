@@ -33,7 +33,7 @@ type MemTable struct {
 // Will create all sub-directories and default associated files.
 // Returns nil if dirs/files could not be created.
 func NewMemTable(name string, threshold int) *MemTable {
-	if err := globals.CreateDirsAndFiles(name); err != nil {
+	if err := createDirsAndFiles(name); err != nil {
 		fmt.Println("error creating table directories: %w", err)
 		return nil
 	}
