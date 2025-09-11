@@ -36,14 +36,8 @@ func makeDefaultTables(table string) error {
 		data[startKey] = ""
 		data[endKey] = ""
 
-		jsonData, err := json.MarshalIndent(data, "", "    ")
-		if err != nil {
-			return fmt.Errorf("error marshalling initilal table data: %w", err)
-		}
-
-		_, err = file.Write(jsonData)
-		if err != nil {
-			return fmt.Errorf("error writing initial table data: %w", err)
+		if err := diskutils.ExportJson(fp, data); err != nil {
+			return err
 		}
 	}
 
@@ -61,11 +55,11 @@ func makeManifestFile(table string) error {
 	if err != nil {
 		return fmt.Errorf("error creating manifest file: %w", err)
 	}
+	defer file.Close()
 
 	data := map[string]string{}
 	encoder := json.NewEncoder(file)
 	if err := encoder.Encode(data); err != nil {
-		file.Close()
 		return fmt.Errorf("error encoding initial manifest: %v", err)
 	}
 

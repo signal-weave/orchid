@@ -6,8 +6,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"orchiddb/storage/tables"
 	"orchiddb/system"
-	"orchiddb/tables"
 )
 
 var majorVersion int = 0 // Proud version
@@ -30,9 +30,13 @@ func main() {
 }
 
 func test1() {
-	testTable := tables.NewSSTable("test_table")
+	testTable := tables.NewSSTable("phone_numbers")
 	err := testTable.Create()
 	if err != nil {
+		fmt.Println(err)
+	}
+
+	if err = testTable.Put("nate", "1234-567-890"); err != nil {
 		fmt.Println(err)
 	}
 }
