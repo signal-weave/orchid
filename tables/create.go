@@ -7,44 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"orchiddb/disk"
+	"orchiddb/diskutils"
 	"orchiddb/globals"
 )
 
-// Creates all necessary directories and populates them with files for a new
-// user-made table.
-func createDirsAndFiles(table string) error {
-	// makeDirs must come first.
-	if err := makeDirs(table); err != nil {
-		return err
-	}
-	if err := makeDefaultTables(table); err != nil {
-		return err
-	}
-	if err := makeManifestFile(table); err != nil {
-		return err
-	}
-	if err := populateInitialManifestFile(table); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func makeDirs(table string) error {
-	if err := os.MkdirAll(globals.GetFlushDir(table), 0o777); err != nil {
-		return fmt.Errorf("error creating flush dir: %w", err)
-	}
-	if err := os.MkdirAll(globals.GetSSTableDir(table), 0o777); err != nil {
-		return fmt.Errorf("error creating sstables dir: %w", err)
-	}
-	if err := os.MkdirAll(globals.GetWALDir(table), 0o777); err != nil {
-		return fmt.Errorf("error creating wal dir: %w", err)
-	}
-
-	return nil
-}
-
+// Makes the starting tables with default value ranges for a new table.
 func makeDefaultTables(table string) error {
 	tableDir := globals.GetSSTableDir(table)
 
@@ -107,7 +74,7 @@ func makeManifestFile(table string) error {
 
 func populateInitialManifestFile(table string) error {
 	ssTableDir := globals.GetSSTableDir(table)
-	ssTables, err := disk.GetDirContents(ssTableDir, false)
+	ssTables, err := diskutils.GetDirContents(ssTableDir, false)
 	if err != nil {
 		return fmt.Errorf("error populating initial manifest file: %w", err)
 	}

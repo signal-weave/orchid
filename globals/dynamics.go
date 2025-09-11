@@ -30,5 +30,9 @@ func GetExecDirectory() string {
 // The directory the .exe file is ran rome.
 var ExeDir = GetExecDirectory()
 
+// The directory the database is configured to operate out of.
+// Defaults to the directory of the executable.
+var DatabaseDir = ExeDir
+
 // The directory for holding table data.
-var TablesDir = filepath.Join(ExeDir, "orchid_tables")
+var TablesDir = filepath.Join(DatabaseDir, "orchid_tables")

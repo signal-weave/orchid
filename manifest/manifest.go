@@ -8,6 +8,7 @@ import (
 )
 
 // -------Example Manifest File-------------------------------------------------
+
 // {
 // 	"sstable_a_1.json": {
 // 		"start": "aardvark",
