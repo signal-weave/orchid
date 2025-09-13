@@ -3,6 +3,8 @@ package storage
 import (
 	"bytes"
 	"encoding/binary"
+
+	"orchiddb/globals"
 )
 
 // Items are the actual user inserted data and live in "nodes".
@@ -47,6 +49,8 @@ func (n *Node) IsLeaf() bool {
 	return len(n.ChildNodes) == 0
 }
 
+// -------Serialization---------------------------------------------------------
+
 // Converts page struct p into a serialized byte array for psersistent storage.
 func (n *Node) serializeToPage(p *page) []byte {
 	buf := p.contents
@@ -87,7 +91,7 @@ func (n *Node) serializeToPage(p *page) []byte {
 
 			// Write the child page as a fixed size of 8 bytes
 			binary.LittleEndian.PutUint64(buf[leftPos:], uint64(childNode))
-			leftPos += PageNumSize
+			leftPos += globals.PageNumSize
 		}
 
 		klen := len(item.Key)
@@ -158,7 +162,7 @@ func (n *Node) deserializeFromPage(p *page) {
 	for range itemsCount {
 		if isLeaf == 0 { // False
 			pn := binary.LittleEndian.Uint64(buf[leftPos:])
-			leftPos += PageNumSize
+			leftPos += globals.PageNumSize
 			n.ChildNodes = append(n.ChildNodes, pageNum(pn))
 		}
 
@@ -187,6 +191,36 @@ func (n *Node) deserializeFromPage(p *page) {
 	}
 }
 
+// -------Size Calulators-------------------------------------------------------
+
+// elementSize returns the size of a key-value-childNode triplet at a given
+// index.
+// If the node is a leaf, then the size of a key-value pair is returned.
+// It's assumed i <= len(node.items).
+func (n *Node) elementSize(i int) int {
+	size := 0
+	size += len(n.Items[i].Key)
+	size += len(n.Items[i].Value)
+	size += globals.PageNumSize
+
+	return size
+}
+
+// nodeSize returns the node's size in bytes.
+func (n *Node) nodeSize() int {
+	size := 0
+	size += globals.NodeHeaderSize
+
+	for i := range n.Items {
+		size += n.elementSize(i)
+	}
+
+	size += globals.PageNumSize
+	return size
+}
+
+// -------Tree Traversal--------------------------------------------------------
+
 // findKeyInNode iterates all the items and finds the key.
 // If the key is found, then the item is returned.
 // If the key isn't found then return the index where it should have been
@@ -209,33 +243,111 @@ func (n *Node) findKeyInNode(key []byte) (bool, int) {
 	return false, len(n.Items)
 }
 
-func (n *Node) FindKey(key []byte) (int, *Node, error) {
-	index, node, err := findKeyHelper(n, key)
+func (n *Node) FindKey(key []byte, exact bool) (int, *Node, []int, error) {
+	ancestorsIndexes := []int{0} // index of root
+	index, node, err := findKeyHelper(n, key, exact, &ancestorsIndexes)
 	if err != nil {
-		return -1, nil, err
+		return -1, nil, nil, err
 	}
-
-	return index, node, nil
+	return index, node, ancestorsIndexes, nil
 }
 
-func findKeyHelper(node *Node, key []byte) (int, *Node, error) {
-	// Search for the key inside the node
+func findKeyHelper(
+	node *Node, key []byte, exact bool, ancestorsIndexes *[]int,
+) (int, *Node, error) {
 	wasFound, index := node.findKeyInNode(key)
 	if wasFound {
 		return index, node, nil
 	}
 
-	// If we reach a leaf node and the key wasn't found, it means it doesn't
-	// exist.
 	if node.IsLeaf() {
-		return -1, nil, nil
+		if exact {
+			return -1, nil, nil
+		}
+		return index, node, nil
 	}
 
-	// Else keep searching the tree
+	*ancestorsIndexes = append(*ancestorsIndexes, index)
 	nextChild, err := node.db.GetNode(node.ChildNodes[index])
 	if err != nil {
 		return -1, nil, err
 	}
+	return findKeyHelper(nextChild, key, exact, ancestorsIndexes)
+}
 
-	return findKeyHelper(nextChild, key)
+// -------Tree Balancing--------------------------------------------------------
+
+func (n *Node) addItem(item *Item, insertionIndex int) {
+	if insertionIndex < 0 {
+		insertionIndex = 0
+	}
+	if insertionIndex > len(n.Items) {
+		insertionIndex = len(n.Items)
+	}
+	n.Items = append(n.Items, nil)
+	copy(n.Items[insertionIndex+1:], n.Items[insertionIndex:])
+	n.Items[insertionIndex] = item
+}
+
+// Does the node require splitting.
+func (n *Node) isOverPopulated() bool {
+	return float32(n.nodeSize()) > n.db.options.MaxThreshold
+}
+
+// Does the node require consolidating.
+func (n *Node) isUnderPopulated() bool {
+	return float32(n.nodeSize()) < n.db.options.MinThreshold
+}
+
+// split rebalances the tree after adding. After insertion the modified node has
+// to be checked to make sure it didn't exceed the maximum number of elements.
+// If it did, then it has to be split and rebalanced. The transformation is
+// depicted in the graph below. If it's not a leaf node, then the children has
+// to be moved as well as shown.
+// This may leave the parent unbalanced by having too many items so rebalancing
+// has to be checked for all the ancestors.
+// The split is performed in a for loop to support splitting a node more than
+// once. (Though in practice used only once).
+//
+//		           n                                        n
+//	                3                                       3,6
+//		      /        \           ------>       /          |          \
+//		   a           modifiedNode            a       modifiedNode     newNode
+//	  1,2                 4,5,6,7,8            1,2          4,5         7,8
+func (n *Node) split(nodeToSplit *Node, nodeToSplitIndex int) {
+	// The first index wehree min amount of bytes to populate a page is
+	// achieved. Then add 1 so it will be split one index after.
+	splitIndex := nodeToSplit.db.getSplitIndex(nodeToSplit)
+
+	middleItem := nodeToSplit.Items[splitIndex]
+	var newNode *Node
+
+	if nodeToSplit.IsLeaf() {
+		newNode = n.db.NewNode(nodeToSplit.Items[splitIndex+1:], []pageNum{})
+		n.db.WriteNode(newNode)
+		nodeToSplit.Items = nodeToSplit.Items[:splitIndex]
+	} else {
+		newNode = n.db.NewNode(
+			nodeToSplit.Items[splitIndex+1:],
+			nodeToSplit.ChildNodes[splitIndex+1:],
+		)
+		n.db.WriteNode(newNode)
+		nodeToSplit.Items = nodeToSplit.Items[:splitIndex]
+		nodeToSplit.ChildNodes = nodeToSplit.ChildNodes[:splitIndex+1]
+	}
+
+	n.addItem(middleItem, nodeToSplitIndex)
+
+	if len(n.ChildNodes) == nodeToSplitIndex+1 {
+		// If middle of list, then move items forward
+		n.ChildNodes = append(n.ChildNodes, newNode.PageNum)
+	} else {
+		n.ChildNodes = append(
+			n.ChildNodes[:nodeToSplitIndex+1],
+			n.ChildNodes[nodeToSplitIndex:]...,
+		)
+		n.ChildNodes[nodeToSplitIndex+1] = newNode.PageNum
+	}
+
+	n.db.WriteNodes(n, nodeToSplit)
 }

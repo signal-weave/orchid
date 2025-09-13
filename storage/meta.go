@@ -2,6 +2,8 @@ package storage
 
 import (
 	"encoding/binary"
+
+	"orchiddb/globals"
 )
 
 const MetaPageNum pageNum = 0 // The meta page's page number in each db file
@@ -31,10 +33,10 @@ func (m *meta) serializeToPage(p *page) {
 	pos := 0
 
 	binary.LittleEndian.PutUint64(buf[pos:], uint64(m.FreelistPage))
-	pos += PageNumSize
+	pos += globals.PageNumSize
 
 	binary.LittleEndian.PutUint64(buf[pos:], uint64(m.RootPage))
-	pos += PageNumSize
+	pos += globals.PageNumSize
 }
 
 // deserializeFromPage constructs a new meta from the contents of page p.
@@ -44,8 +46,8 @@ func (m *meta) deserializeFromPage(p *page) {
 	pos := 0
 
 	m.FreelistPage = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
-	pos += PageNumSize
+	pos += globals.PageNumSize
 
 	m.RootPage = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
-	pos += PageNumSize
+	pos += globals.PageNumSize
 }

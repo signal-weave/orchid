@@ -5,6 +5,12 @@ package globals
 // This is not meant to contain mutable values.
 // -----------------------------------------------------------------------------
 
+// -------Storage---------------------------------------------------------------
+const (
+	NodeHeaderSize = 3
+	PageNumSize    = 8 // The size of a page's number in bytes
+)
+
 // -------Misc------------------------------------------------------------------
 const (
 	Developer = "Signal Weave"

@@ -8,6 +8,7 @@ import (
 	"orchiddb/globals"
 )
 
+// A pager is a helper struct for opening db files to read/write/sync pages.
 type Pager struct {
 	f *os.File
 }

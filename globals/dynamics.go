@@ -37,5 +37,13 @@ var DatabaseDir = ExeDir
 // The directory for holding table data.
 var TablesDir = filepath.Join(DatabaseDir, "orchid_tables")
 
+// -------Database Page Options-------------------------------------------------
+
 // The size of a page in bytes.
 var PageSize = os.Getpagesize()
+
+// The minimum a page must be filled before it is consolidated.
+var MinFillPercent float32 = 0.5
+
+// The maximum a page can be filled before it is split.
+var MaxFillPercent float32 = 0.95

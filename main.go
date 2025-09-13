@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"orchiddb/globals"
 	"orchiddb/storage"
 	"orchiddb/system"
 )
@@ -13,36 +14,33 @@ var patchVersion int = 0 // Sucky verison
 func main() {
 	system.PrintStartupText(majorVersion, minorVersion, patchVersion)
 
-	test1()
+	test()
 }
 
-func test1() {
-	db, err := storage.GetDB("db.db")
+func test() {
+	globals.MinFillPercent = 0.0125
+	globals.MaxFillPercent = 0.025
+	options := storage.NewOptions()
+
+	db, err := storage.GetDB("db.db", options)
 	if err != nil {
 		panic(err)
 	}
 	defer db.Close()
 
-	// Insert one record
-	if err := db.Put([]byte("Key1"), []byte("Value1")); err != nil {
-		panic(err)
-	}
+	db.Put([]byte("Key1"), []byte("Value1"))
+	db.Put([]byte("Key2"), []byte("Value2"))
+	db.Put([]byte("Key3"), []byte("Value3"))
+	db.Put([]byte("Key4"), []byte("Value4"))
+	db.Put([]byte("Key5"), []byte("Value5"))
+	db.Put([]byte("Key6"), []byte("Value6"))
 
-	// Fetch root node again
-	node, err := db.GetNode(db.Meta.RootPage)
-	if err != nil {
-		panic(err)
-	}
+	for _, v := range []string{"Key1", "Key2", "Key3", "Key4", "Key5", "Key6"} {
+		item, err := db.Find([]byte(v))
+		if err != nil {
+			fmt.Println("error:", err)
+		}
 
-	index, containingNode, err := node.FindKey([]byte("Key1"))
-	if err != nil {
-		panic(err)
+		fmt.Printf("key is: %s, value is: %s\n", item.Key, item.Value)
 	}
-	if index < 0 || containingNode == nil {
-		fmt.Println("Key not found")
-		return
-	}
-
-	res := containingNode.Items[index]
-	fmt.Printf("Key is: %s, value is: %s\n", res.Key, res.Value)
 }

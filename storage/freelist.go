@@ -2,6 +2,8 @@ package storage
 
 import (
 	"encoding/binary"
+
+	"orchiddb/globals"
 )
 
 // metaPage is the maximum pgnum that is used by the db for its own purposes.
@@ -26,6 +28,8 @@ func newFreelist() *freelist {
 	}
 }
 
+// -------Page Management-------------------------------------------------------
+
 // getNextPage returns page ids for writing.
 // New page ids are first given from the releasedPageIDs to avoid growing the
 // file. If it's empty, then maxPage is incremented and a new page is created
@@ -46,6 +50,8 @@ func (fr *freelist) ReleasePage(page pageNum) {
 	fr.ReleasedPages = append(fr.ReleasedPages, page)
 }
 
+// -------Serialization---------------------------------------------------------
+
 // serializeToPage writes the freelist's contents into page p.
 func (fr *freelist) serializeToPage(p *page) []byte {
 	buf := p.contents
@@ -53,7 +59,7 @@ func (fr *freelist) serializeToPage(p *page) []byte {
 
 	// MaxPage count
 	binary.LittleEndian.PutUint64(buf[pos:], uint64(fr.MaxPage))
-	pos += 2
+	pos += 8
 
 	// released pages count
 	binary.LittleEndian.PutUint16(buf[pos:], uint16(len(fr.ReleasedPages)))
@@ -61,7 +67,7 @@ func (fr *freelist) serializeToPage(p *page) []byte {
 
 	for _, page := range fr.ReleasedPages {
 		binary.LittleEndian.PutUint64(buf[pos:], uint64(page))
-		pos += PageNumSize
+		pos += globals.PageNumSize
 	}
 
 	return buf
@@ -81,7 +87,7 @@ func (fr *freelist) deserializeFromPage(p *page) {
 
 	for range releasedPagesCount {
 		page := pageNum(binary.LittleEndian.Uint64(buf[pos:]))
-		pos += PageNumSize
+		pos += globals.PageNumSize
 		fr.ReleasedPages = append(fr.ReleasedPages, page)
 	}
 }
