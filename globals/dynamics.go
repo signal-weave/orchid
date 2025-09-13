@@ -36,3 +36,6 @@ var DatabaseDir = ExeDir
 
 // The directory for holding table data.
 var TablesDir = filepath.Join(DatabaseDir, "orchid_tables")
+
+// The size of a page in bytes.
+var PageSize = os.Getpagesize()

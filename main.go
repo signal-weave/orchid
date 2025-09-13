@@ -2,11 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
-	"syscall"
-
-	"orchiddb/storage/tables"
+	"orchiddb/storage"
 	"orchiddb/system"
 )
 
@@ -17,26 +13,36 @@ var patchVersion int = 0 // Sucky verison
 func main() {
 	system.PrintStartupText(majorVersion, minorVersion, patchVersion)
 
-	// -------Testing funcs-----------------------------------------------------
-
 	test1()
-
-	// -------Keep the program open---------------------------------------------
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-
-	<-sigs
-	fmt.Println("Shutting down cleanly...")
 }
 
 func test1() {
-	testTable := tables.NewSSTable("phone_numbers")
-	err := testTable.Create()
+	db, err := storage.GetDB("db.db")
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
+	}
+	defer db.Close()
+
+	// Insert one record
+	if err := db.Put([]byte("Key1"), []byte("Value1")); err != nil {
+		panic(err)
 	}
 
-	if err = testTable.Put("nate", "1234-567-890"); err != nil {
-		fmt.Println(err)
+	// Fetch root node again
+	node, err := db.GetNode(db.Meta.RootPage)
+	if err != nil {
+		panic(err)
 	}
+
+	index, containingNode, err := node.FindKey([]byte("Key1"))
+	if err != nil {
+		panic(err)
+	}
+	if index < 0 || containingNode == nil {
+		fmt.Println("Key not found")
+		return
+	}
+
+	res := containingNode.Items[index]
+	fmt.Printf("Key is: %s, value is: %s\n", res.Key, res.Value)
 }
