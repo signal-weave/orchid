@@ -43,7 +43,7 @@ func (gc *GetCommand) TokenLiteral() string {
 
 func (gc *GetCommand) String() string {
 	return fmt.Sprintf(
-		"%s(%s, %s)",
+		"cmd: %s(table: %s, key: %s)",
 		gc.Token.Literal, gc.Table.Token.Literal, gc.Key.Token.Literal,
 	)
 }
@@ -64,7 +64,7 @@ func (dc *PutCommand) TokenLiteral() string {
 
 func (dc *PutCommand) String() string {
 	return fmt.Sprintf(
-		"%s(%s, %s, %s)",
+		"cmd: %s(table: %s, key: %s, value: %s)",
 		dc.Token.Literal, dc.Table.Token.Literal,
 		dc.Key.Token.Literal, dc.Value.Token.Literal,
 	)
@@ -85,7 +85,7 @@ func (dc *DelCommand) TokenLiteral() string {
 
 func (dc *DelCommand) String() string {
 	return fmt.Sprintf(
-		"%s(%s, %s)",
+		"cmd: %s(table: %s, key: %s)",
 		dc.Token.Literal, dc.Table.Token.Literal, dc.Key.Token.Literal,
 	)
 }
