@@ -34,13 +34,15 @@ func test() {
 	db.Put([]byte("Key4"), []byte("Value4"))
 	db.Put([]byte("Key5"), []byte("Value5"))
 	db.Put([]byte("Key6"), []byte("Value6"))
-
 	for _, v := range []string{"Key1", "Key2", "Key3", "Key4", "Key5", "Key6"} {
-		item, err := db.Find([]byte(v))
-		if err != nil {
-			fmt.Println("error:", err)
-		}
-
+		item, _ := db.Get([]byte(v))
 		fmt.Printf("key is: %s, value is: %s\n", item.Key, item.Value)
 	}
+
+	_ = db.Del([]byte("Key1"))
+	item, _ := db.Get([]byte("Key1"))
+
+	db.WriteFreelist()
+	fmt.Printf("item is: %+v\n", item)
+	_ = db.Close()
 }

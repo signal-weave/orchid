@@ -69,7 +69,7 @@ func createDB(path string, options *Options) (*DB, error) {
 	db := DB{options: *options, pager: pager, Meta: m, freelist: fr}
 
 	root := NewEmptyNode()
-	root.PageNum = m.RootPage
+	root.pageNum = m.RootPage
 	if err := db.WriteNode(root); err != nil {
 		pager.Close()
 		return nil, fmt.Errorf("write root: %w", err)
@@ -136,13 +136,26 @@ func (db *DB) AllocatePage() (*page, error) {
 // ReleasePage marks a page as free and persists the freelist.
 func (db *DB) ReleasePage(pn pageNum) error {
 	db.freelist.ReleasePage(pn)
-	flPg := NewEmptyPage(db.Meta.FreelistPage)
+	return db.WriteFreelist()
+}
 
-	db.freelist.serializeToPage(flPg)
-	if err := db.pager.WritePage(flPg); err != nil {
+func (db *DB) WriteFreelist() error {
+	pg := NewEmptyPage(db.Meta.FreelistPage)
+	db.freelist.serializeToPage(pg)
+	err := db.pager.WritePage(pg)
+	if err != nil {
 		return err
 	}
+	return db.pager.Sync()
+}
 
+func (db *DB) WriteMeta() error {
+	pg := NewEmptyPage(MetaPageNum)
+	db.Meta.serializeToPage(pg)
+	err := db.pager.WritePage(pg)
+	if err != nil {
+		return err
+	}
 	return db.pager.Sync()
 }
 
@@ -150,9 +163,9 @@ func (db *DB) ReleasePage(pn pageNum) error {
 
 func (db *DB) NewNode(items []*Item, childNodes []pageNum) *Node {
 	node := NewEmptyNode()
-	node.Items = items
-	node.ChildNodes = childNodes
-	node.PageNum = db.freelist.GetNextPage()
+	node.items = items
+	node.childNodes = childNodes
+	node.pageNum = db.freelist.GetNextPage()
 	node.db = db
 
 	return node
@@ -191,7 +204,7 @@ func (db *DB) GetNodes(indexes []int) ([]*Node, error) {
 	nodes := []*Node{root}
 	child := root
 	for i := 1; i < len(indexes); i++ {
-		child, err = db.GetNode(child.ChildNodes[indexes[i]])
+		child, err = db.GetNode(child.childNodes[indexes[i]])
 		if err != nil {
 			return nil, err
 		}
@@ -205,15 +218,15 @@ func (db *DB) WriteNode(n *Node) error {
 	var pg *page
 	var err error
 
-	if n.PageNum == 0 {
+	if n.pageNum == 0 {
 		// Only allocate when the node doesn't already have an assigned page.
 		pg, err = db.AllocatePage()
 		if err != nil {
 			return err
 		}
-		n.PageNum = pg.pageNum
+		n.pageNum = pg.pageNum
 	} else {
-		pg = NewEmptyPage(n.PageNum)
+		pg = NewEmptyPage(n.pageNum)
 	}
 
 	n.serializeToPage(pg)
@@ -237,8 +250,10 @@ func (db *DB) WriteNodes(nodes ...*Node) error {
 	return nil
 }
 
-func (db *DB) DeleteNode(pageNum pageNum) {
+// Mark the pageNum as freed, then persist the freelist page to disk.
+func (db *DB) DeleteNode(pageNum pageNum) error {
 	db.freelist.ReleasePage(pageNum)
+	return db.WriteFreelist()
 }
 
 // -------Node Tree Balancing---------------------------------------------------
@@ -251,12 +266,12 @@ func (db *DB) getSplitIndex(node *Node) int {
 	size := 0
 	size += globals.NodeHeaderSize
 
-	for i := range node.Items {
+	for i := range node.items {
 		size += node.elementSize(i)
 
 		// If we have a big enough page size (more than minimum), but didn't
 		// reach the last item, we can spare an element.
-		if float32(size) > db.options.MinThreshold && i < len(node.Items)-1 {
+		if float32(size) > db.options.MinThreshold && i < len(node.items)-1 {
 			return i + 1
 		}
 	}
@@ -264,8 +279,10 @@ func (db *DB) getSplitIndex(node *Node) int {
 	return -1
 }
 
-// Find returns an item according to the given key by performing binary search.
-func (db *DB) Find(key []byte) (*Item, error) {
+// -------Value Operators-------------------------------------------------------
+
+// Get returns an item according to the given key by performing binary search.
+func (db *DB) Get(key []byte) (*Item, error) {
 	n, err := db.GetNode(db.Meta.RootPage)
 	if err != nil {
 		return nil, err
@@ -279,7 +296,7 @@ func (db *DB) Find(key []byte) (*Item, error) {
 		return nil, nil
 	}
 
-	return containingNode.Items[index], nil
+	return containingNode.items[index], nil
 }
 
 // Put adds a key to the tree. It finds the correct node and the insertion index
@@ -301,11 +318,11 @@ func (db *DB) Put(key []byte, value []byte) error {
 	}
 
 	// If key already exists
-	exists := insertionIdx < len(nodeToInsertIn.Items) &&
-		bytes.Equal(nodeToInsertIn.Items[insertionIdx].Key, key)
+	exists := insertionIdx < len(nodeToInsertIn.items) &&
+		bytes.Equal(nodeToInsertIn.items[insertionIdx].Key, key)
 
 	if exists {
-		nodeToInsertIn.Items[insertionIdx] = i
+		nodeToInsertIn.items[insertionIdx] = i
 	} else {
 		nodeToInsertIn.addItem(i, insertionIdx)
 	}
@@ -334,7 +351,7 @@ func (db *DB) Put(key []byte, value []byte) error {
 	// Handle root
 	rootNode := ancestors[0]
 	if rootNode.isOverPopulated() {
-		newRoot := db.NewNode([]*Item{}, []pageNum{rootNode.PageNum})
+		newRoot := db.NewNode([]*Item{}, []pageNum{rootNode.pageNum})
 		newRoot.split(rootNode, 0)
 
 		// commit newly created root
@@ -343,10 +360,72 @@ func (db *DB) Put(key []byte, value []byte) error {
 			return err
 		}
 
-		db.Meta.RootPage = newRoot.PageNum
-		mpg := NewEmptyPage(pageNum(0))
-		db.Meta.serializeToPage(mpg)
-		db.pager.WritePage(mpg)
+		db.Meta.RootPage = newRoot.pageNum
+		db.WriteMeta()
+	}
+
+	return nil
+}
+
+// Remove removes a key from the tree.
+// It finds the correct node and the index to remove the item from and removes it.
+// When performing the search, the ancestors are returned as well.
+// This way we can iterate over them to check which nodes were modified and
+// rebalance by rotating or merging the unbalanced nodes. Rotation is done first.
+// If the siblings don't have enough items, then merging occurs. If the root is
+// without items after a split, then the root is removed and the tree is one
+// level shorter.
+func (db *DB) Del(key []byte) error {
+	// Find the path to the node where the deletion should happen.
+	rootNode, err := db.GetNode(db.Meta.RootPage)
+	if err != nil {
+		return err
+	}
+
+	removeItemIdx, nodeToRemoveFrom, ancestorsIdxs, err := rootNode.FindKey(key, true)
+	if err != nil {
+		return err
+	}
+
+	if removeItemIdx == -1 {
+		return nil
+	}
+
+	if nodeToRemoveFrom.isLeaf() {
+		nodeToRemoveFrom.removeItemFromLeaf(removeItemIdx)
+	} else {
+		affectedNodes, err := nodeToRemoveFrom.removeItemFromInternal(removeItemIdx)
+		if err != nil {
+			return err
+		}
+		ancestorsIdxs = append(ancestorsIdxs, affectedNodes...)
+	}
+
+	ancestors, err := db.GetNodes(ancestorsIdxs)
+	if err != nil {
+		return err
+	}
+
+	// Reblance the nodes all teh way up.
+	// Start from one node before the last and go all teh way up, excluding root.
+	for i := len(ancestors) - 2; i >= 0; i-- {
+		pnode := ancestors[i]
+		node := ancestors[i+1]
+		if node.isUnderPopulated() {
+			err = pnode.reblanceRemove(node, ancestorsIdxs[i+1])
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	rootNode = ancestors[0]
+	// If the root node has no items after rebalancing, there's no need to save
+	// it because we ignore it.
+	if len(rootNode.items) == 0 && len(rootNode.childNodes) > 0 {
+		// Mark new root page in meta page and persist it to disk.
+		db.Meta.RootPage = ancestors[1].pageNum
+		return db.WriteMeta()
 	}
 
 	return nil
