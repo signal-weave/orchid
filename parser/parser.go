@@ -27,6 +27,8 @@ func NewParser(l *Lexer) *Parser {
 	}
 
 	p.parseFunctions = make(map[TokenType]parseCmdFn)
+	p.registerParseFn(MAKE, p.parseMakeCommand)
+	p.registerParseFn(DROP, p.parseDropCommand)
 	p.registerParseFn(GET, p.parseGetCommand)
 	p.registerParseFn(PUT, p.parsePutCommand)
 	p.registerParseFn(DEL, p.parseDelCommand)
@@ -122,6 +124,54 @@ func (p *Parser) missingNextArg(argName, cmd string) bool {
 		return true
 	}
 	return false
+}
+
+func (p *Parser) parseMakeCommand() Node {
+	cmd := &MakeCommand{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	if p.missingNextArg("Table", MAKE) {
+		// move passed RPAREN
+		return nil
+	}
+
+	p.nextToken() // Move passed LPAREN to TABLE
+
+	table := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	cmd.Table = table
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	return cmd
+}
+
+func (p *Parser) parseDropCommand() Node {
+	cmd := &DropCommand{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	if p.missingNextArg("Table", DROP) {
+		// move passed RPAREN
+		return nil
+	}
+
+	p.nextToken() // Move passed LPAREN to TABLE
+
+	table := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	cmd.Table = table
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	return cmd
 }
 
 func (p *Parser) parseGetCommand() Node {

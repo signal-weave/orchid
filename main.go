@@ -57,11 +57,14 @@ func test() {
 }
 
 func test2() {
+
+	makeInput := "MAKE(TestTable)"
 	putInput := "PUT(TestTable, Key7, Value7)"
 	getInput := "GET(TestTable, Key7)"
 	delInput := "DEL(TestTable, Key7)"
+	dropInput := "DROP(TestTable)"
 
-	inputs := []string{putInput, getInput, delInput}
+	inputs := []string{makeInput, putInput, getInput, delInput, dropInput}
 
 	for _, v := range inputs {
 		l := parser.NewLexer(v)

@@ -28,8 +28,47 @@ type Identifier struct {
 func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
 func (i *Identifier) String() string       { return i.Value }
 
+// -------MAKE Command----------------------------------------------------------
+
+// MakeCommand represents user intent to create a new table.
+type MakeCommand struct {
+	// MAKE(table)
+	Token Token       // the 'MAKE' keyword token
+	Table *Identifier // the first argument identifier
+}
+
+func (dc *MakeCommand) TokenLiteral() string {
+	return dc.Token.Literal
+}
+
+func (dc *MakeCommand) String() string {
+	return fmt.Sprintf(
+		"cmd: %s( table: %s )", dc.Token.Literal, dc.Table.Token.Literal,
+	)
+}
+
+// -------DROP Command----------------------------------------------------------
+
+// DropCommand represents user intent to drop, or remove, an existing table.
+type DropCommand struct {
+	// DROP(table)
+	Token Token       // the 'DROP' keyword token
+	Table *Identifier // the first argument identifier
+}
+
+func (dc *DropCommand) TokenLiteral() string {
+	return dc.Token.Literal
+}
+
+func (dc *DropCommand) String() string {
+	return fmt.Sprintf(
+		"cmd: %s( table: %s )", dc.Token.Literal, dc.Table.Token.Literal,
+	)
+}
+
 // -------GET Command-----------------------------------------------------------
 
+// GetCommand represents user intent to get the value of cmd.Key from cmd.Table.
 type GetCommand struct {
 	// GET(table, key)
 	Token Token       // the 'GET' keyword token
@@ -43,13 +82,15 @@ func (gc *GetCommand) TokenLiteral() string {
 
 func (gc *GetCommand) String() string {
 	return fmt.Sprintf(
-		"cmd: %s(table: %s, key: %s)",
+		"cmd: %s( table: %s, key: %s )",
 		gc.Token.Literal, gc.Table.Token.Literal, gc.Key.Token.Literal,
 	)
 }
 
 // -------PUT Command-----------------------------------------------------------
 
+// PutCommand represents user intent to put the value of cmd.Value for cmd.Key
+// into cmd.Table.
 type PutCommand struct {
 	// PUT(table, key, value)
 	Token Token       // the 'PUT' keyword token
@@ -64,7 +105,7 @@ func (dc *PutCommand) TokenLiteral() string {
 
 func (dc *PutCommand) String() string {
 	return fmt.Sprintf(
-		"cmd: %s(table: %s, key: %s, value: %s)",
+		"cmd: %s( table: %s, key: %s, value: %s )",
 		dc.Token.Literal, dc.Table.Token.Literal,
 		dc.Key.Token.Literal, dc.Value.Token.Literal,
 	)
@@ -72,6 +113,7 @@ func (dc *PutCommand) String() string {
 
 // -------DEL Command-----------------------------------------------------------
 
+// DelCommand represents user intent to delete the cmd.Key from cmd.Table.
 type DelCommand struct {
 	// DEL(table, key)
 	Token Token       // the 'DEL' keyword token
@@ -85,7 +127,7 @@ func (dc *DelCommand) TokenLiteral() string {
 
 func (dc *DelCommand) String() string {
 	return fmt.Sprintf(
-		"cmd: %s(table: %s, key: %s)",
+		"cmd: %s( table: %s, key: %s )",
 		dc.Token.Literal, dc.Table.Token.Literal, dc.Key.Token.Literal,
 	)
 }
