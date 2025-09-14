@@ -116,22 +116,15 @@ func (tbl *Table) Close() error {
 // -------Page Management-------------------------------------------------------
 
 // AllocatePage returns a fresh page number, writing back freelist state.
-func (tbl *Table) AllocatePage() (*page, error) {
+func (tbl *Table) AllocatePage() *page {
 	pn := tbl.freelist.GetNextPage()
 
 	// Persist freelist after allocation
 	flPg := NewEmptyPage(tbl.Meta.FreelistPage)
 	tbl.freelist.serializeToPage(flPg)
 
-	if err := tbl.pager.WritePage(flPg); err != nil {
-		return nil, err
-	}
-	if err := tbl.pager.Sync(); err != nil {
-		return nil, err
-	}
-
 	newPage := NewEmptyPage(pn)
-	return newPage, nil
+	return newPage
 }
 
 // ReleasePage marks a page as free and persists the freelist.
@@ -217,14 +210,10 @@ func (tbl *Table) GetNodes(indexes []int) ([]*Node, error) {
 // Serializes the given node n into a page, writes it out and syncs.
 func (tbl *Table) WriteNode(n *Node) error {
 	var pg *page
-	var err error
 
 	if n.pageNum == 0 {
 		// Only allocate when the node doesn't already have an assigned page.
-		pg, err = tbl.AllocatePage()
-		if err != nil {
-			return err
-		}
+		pg = tbl.AllocatePage()
 		n.pageNum = pg.pageNum
 	} else {
 		pg = NewEmptyPage(n.pageNum)

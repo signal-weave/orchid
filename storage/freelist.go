@@ -57,6 +57,10 @@ func (fr *freelist) serializeToPage(p *page) []byte {
 	buf := p.contents
 	pos := 0
 
+	// Page marker
+	insertPageMarker(buf)
+	pos += 4
+
 	// MaxPage count
 	binary.LittleEndian.PutUint64(buf[pos:], uint64(fr.MaxPage))
 	pos += 8
@@ -79,9 +83,15 @@ func (fr *freelist) deserializeFromPage(p *page) {
 	pos := 0
 	fr.ReleasedPages = fr.ReleasedPages[:0] // reset
 
+	// Page marker
+	verifyPageMarker(buf)
+	pos += 4
+
+	// Max page count
 	fr.MaxPage = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
 	pos += 8
 
+	// Release page count
 	releasedPagesCount := int(binary.LittleEndian.Uint16(buf[pos:]))
 	pos += 2
 

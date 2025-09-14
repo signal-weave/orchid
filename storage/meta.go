@@ -30,9 +30,11 @@ func newMeta() *meta {
 
 // serializeToPage writes the meta's contents into page p.
 func (m *meta) serializeToPage(p *page) {
+	pos := 0
 	buf := p.contents
 
-	pos := 0
+	insertPageMarker(buf)
+	pos += 4
 
 	binary.LittleEndian.PutUint64(buf[pos:], uint64(m.FreelistPage))
 	pos += globals.PageNumSize
@@ -43,9 +45,11 @@ func (m *meta) serializeToPage(p *page) {
 
 // deserializeFromPage constructs a new meta from the contents of page p.
 func (m *meta) deserializeFromPage(p *page) {
+	pos := 0
 	buf := p.contents
 
-	pos := 0
+	verifyPageMarker(buf)
+	pos += 4
 
 	m.FreelistPage = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
 	pos += globals.PageNumSize

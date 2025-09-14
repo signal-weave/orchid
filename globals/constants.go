@@ -9,7 +9,16 @@ package globals
 const (
 	NodeHeaderSize = 3
 	PageNumSize    = 8 // The size of a page's number in bytes
+
+	PageMarkerSize = 4 // The size of a page marker in bytes
+	
+	PM_Z = byte('z')
+	PM_T = byte('t')
+	PM_C = byte('c')
+	PM_H = byte('h')
 )
+
+var PageMarker = []byte{PM_Z, PM_T, PM_C, PM_H}
 
 // -------Misc------------------------------------------------------------------
 const (

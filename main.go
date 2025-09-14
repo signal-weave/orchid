@@ -9,7 +9,7 @@ import (
 )
 
 var majorVersion int = 0 // Proud version
-var minorVersion int = 1 // Real version
+var minorVersion int = 2 // Real  version
 var patchVersion int = 0 // Sucky verison
 
 func main() {

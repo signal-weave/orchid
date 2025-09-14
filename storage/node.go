@@ -63,11 +63,28 @@ func (n *Node) canSpareAnElement() bool {
 
 // Converts page struct p into a serialized byte array for psersistent storage.
 func (n *Node) serializeToPage(p *page) []byte {
+	// We use slotted pages for storing data in the page. This means the actual
+	// keys and values (the cells) are appended to right of the page whereas
+	// offsets have a fixed size and are appended from the left.
+	// It's easier to preserve the logical order (alphabetical in the case of
+	// b-tree) using the metadata and performing pointer arithmetic. Using the
+	// data itself is harder as it varies by size.
+	//
+	// Page structure is:
+	// -------------------------------------------------------------------------
+	// |  Page  | key-value /  child node    key-value 		|  key-value       |
+	// | Header |   offset /	 pointer	  offset   .... |    data    ..... |
+	// -------------------------------------------------------------------------
+
 	buf := p.contents
 	leftPos := 0
 	rightPos := len(buf) - 1
 
-	// Add page header: isLeaf, key-value pairs count
+	// Add page header: marker, isLeaf, key-value pairs count
+
+	// marker
+	insertPageMarker(buf)
+	leftPos += 4
 
 	// isLeaf
 	isLeaf := n.isLeaf()
@@ -81,19 +98,6 @@ func (n *Node) serializeToPage(p *page) []byte {
 	// key-value pairs count
 	binary.LittleEndian.PutUint16(buf[leftPos:], uint16(len(n.items)))
 	leftPos += 2
-
-	// We use slotted pages for storing data in the page. This means the actual
-	// keys and values (the cells) are appended to right of the page whereas
-	// offsets have a fixed size and are appended from the left.
-	// It's easier to preserve the logical order (alphabetical in the case of
-	// b-tree) using the metadata and performing pointer arithmetic. Using the
-	// data itself is harder as it varies by size.
-
-	// Page structure is:
-	// -------------------------------------------------------------------------
-	// |  Page  | key-value /  child node    key-value 		|  key-value       |
-	// | Header |   offset /	 pointer	  offset   .... |    data    ..... |
-	// -------------------------------------------------------------------------
 
 	for i, item := range n.items {
 		if !isLeaf {
@@ -163,10 +167,14 @@ func (n *Node) deserializeFromPage(p *page) {
 	leftPos := 0
 
 	// Read header
-	isLeaf := uint16(buf[0])
+	verifyPageMarker(buf)
+	leftPos += 4
 
-	itemsCount := int(binary.LittleEndian.Uint16(buf[1:3]))
-	leftPos += 3
+	isLeaf := uint16(buf[leftPos])
+	leftPos += 1
+
+	itemsCount := int(binary.LittleEndian.Uint16(buf[leftPos : leftPos+2]))
+	leftPos += 2
 
 	// Read body
 	for range itemsCount {
