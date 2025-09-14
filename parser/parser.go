@@ -1,0 +1,282 @@
+package parser
+
+import "fmt"
+
+type (
+	parseCmdFn func() Node
+)
+
+// The primary token parsing engine.
+// Contains a lexer that will lex a byte stream, creating an array of tokens.
+// These tokens will then be parsed into command nodes and finally packed into a
+// command struct containing the command.
+type Parser struct {
+	l      *Lexer
+	errors []string
+
+	curToken  Token
+	peekToken Token
+
+	parseFunctions map[TokenType]parseCmdFn
+}
+
+func NewParser(l *Lexer) *Parser {
+	p := &Parser{
+		l:      l,
+		errors: []string{},
+	}
+
+	p.parseFunctions = make(map[TokenType]parseCmdFn)
+	p.registerParseFn(GET, p.parseGetCommand)
+	p.registerParseFn(PUT, p.parsePutCommand)
+	p.registerParseFn(DEL, p.parseDelCommand)
+
+	// Read two tokens, so curToken and peekToken are both set.
+	p.nextToken()
+	p.nextToken()
+
+	return p
+}
+
+func (p *Parser) registerParseFn(tokenType TokenType, fn parseCmdFn) {
+	p.parseFunctions[tokenType] = fn
+}
+
+// Instructs the Lexer to parse out the next token and then decides which parse
+// function to invoke based on lexed token type.
+// Currently only supports queries of a single command.
+func (p *Parser) ParseCommand() *Command {
+	cmd := &Command{}
+
+	for p.curToken.Type != EOF {
+		parseFn, ok := p.parseFunctions[p.curToken.Type]
+
+		if !ok {
+			p.noPrefixParseFnError(p.curToken.Type)
+			return nil
+		}
+
+		n := parseFn()
+		cmd.Command = n
+		p.nextToken()
+	}
+
+	return cmd
+}
+
+// -------Token Handling--------------------------------------------------------
+
+func (p *Parser) nextToken() {
+	p.curToken = p.peekToken
+	p.peekToken = p.l.NextToken()
+}
+
+func (p *Parser) peekTokenIs(t TokenType) bool {
+	return p.peekToken.Type == t
+}
+
+func (p *Parser) expectPeek(t TokenType) bool {
+	if p.peekTokenIs(t) {
+		p.nextToken()
+		return true
+	} else {
+		p.peekError(t)
+		return false
+	}
+}
+
+// -------Error Handling--------------------------------------------------------
+
+func (p *Parser) Errors() []string {
+	return p.errors
+}
+
+func (p *Parser) peekError(t TokenType) {
+	msg := fmt.Sprintf("[ERROR] expected next token to be %s, got %s instead",
+		t, p.peekToken.Type)
+	p.errors = append(p.errors, msg)
+}
+
+func (p *Parser) noPrefixParseFnError(t TokenType) {
+	msg := fmt.Sprintf("[ERROR] no prefix parse function for %s found", t)
+	p.errors = append(p.errors, msg)
+}
+
+func (p *Parser) missingArgumentError(arg, cmd string) {
+	msg := fmt.Sprintf("[ERROR] missing %s argument for %s command", arg, cmd)
+	p.errors = append(p.errors, msg)
+}
+
+// For debugging purposes.
+func (p *Parser) PrintCurTokenData() {
+	fmt.Println("cur type", p.curToken.Type)
+	fmt.Println("cur literal", p.curToken.Literal)
+}
+
+// -------Command Parsing-------------------------------------------------------
+
+func (p *Parser) missingNextArg(argName, cmd string) bool {
+	if p.peekTokenIs(RPAREN) || p.peekTokenIs(COMMA) {
+		p.nextToken() // Move passed RPAREN
+		p.missingArgumentError(argName, cmd)
+		return true
+	}
+	return false
+}
+
+func (p *Parser) parseGetCommand() Node {
+	cmd := &GetCommand{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	args := p.parseGetParameters()
+	if args == nil {
+		return nil
+	} else if len(args) != 2 { // table + key
+		return nil
+	}
+
+	cmd.Table = args[0]
+	cmd.Key = args[1]
+
+	return cmd
+}
+
+func (p *Parser) parseGetParameters() []*Identifier {
+	identifiers := []*Identifier{}
+
+	if p.missingNextArg("Table", GET) {
+		// move passed RPAREN
+		return nil
+	}
+
+	p.nextToken() // Move passed LPAREN to TABLE
+
+	table := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, table)
+
+	p.nextToken() // Move to COMMA
+	if p.missingNextArg("Key", GET) {
+		return nil
+	}
+	p.nextToken() // Move to KEY
+
+	key := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, key)
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	return identifiers
+}
+
+func (p *Parser) parsePutCommand() Node {
+	cmd := &PutCommand{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	args := p.parsePutParameters()
+	if args == nil {
+		return nil
+	} else if len(args) != 3 { // table + key + value
+		return nil
+	}
+
+	cmd.Table = args[0]
+	cmd.Key = args[1]
+	cmd.Value = args[2]
+
+	return cmd
+}
+
+func (p *Parser) parsePutParameters() []*Identifier {
+	identifiers := []*Identifier{}
+
+	if p.missingNextArg("Table", PUT) {
+		// move passed RPAREN
+		return nil
+	}
+
+	p.nextToken() // Move passed LPAREN to TABLE
+
+	table := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, table)
+
+	p.nextToken() // Move to COMMA
+	if p.missingNextArg("Key", PUT) {
+		return nil
+	}
+	p.nextToken() // Move to KEY
+
+	key := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, key)
+
+	p.nextToken() // Move to COMMA
+	if p.missingNextArg("Value", PUT) {
+		return nil
+	}
+	p.nextToken() // Move to VALUE
+
+	value := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, value)
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	return identifiers
+}
+
+func (p *Parser) parseDelCommand() Node {
+	cmd := &DelCommand{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+
+	args := p.parseDelParameters()
+	if args == nil {
+		return nil
+	} else if len(args) != 2 { // table + key
+		return nil
+	}
+
+	cmd.Table = args[0]
+	cmd.Key = args[1]
+
+	return cmd
+}
+
+func (p *Parser) parseDelParameters() []*Identifier {
+	identifiers := []*Identifier{}
+
+	if p.missingNextArg("Table", GET) {
+		// move passed RPAREN
+		return nil
+	}
+
+	p.nextToken() // Move passed LPAREN to TABLE
+
+	table := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, table)
+
+	p.nextToken() // Move to COMMA
+	if p.missingNextArg("Key", GET) {
+		return nil
+	}
+	p.nextToken() // Move to KEY
+
+	key := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	identifiers = append(identifiers, key)
+
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	return identifiers
+}
