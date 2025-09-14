@@ -37,3 +37,5 @@ go.work.sum
 # generated files
 orchid_tables/
 *.db
+.idea
+/vscode
