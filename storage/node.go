@@ -37,7 +37,7 @@ type Node struct {
 	pageNum    pageNum
 	items      []*Item
 	childNodes []pageNum
-	db         *DB
+	tbl        *Table
 }
 
 func NewEmptyNode() *Node {
@@ -52,7 +52,7 @@ func (n *Node) isLeaf() bool {
 // canSpareAnElement checks if the node size is big enough to populate a page
 // after giving away one item.
 func (n *Node) canSpareAnElement() bool {
-	splitIndex := n.db.getSplitIndex(n)
+	splitIndex := n.tbl.getSplitIndex(n)
 	if splitIndex == -1 {
 		return false
 	}
@@ -278,7 +278,7 @@ func findKeyHelper(
 	}
 
 	*ancestorsIndexes = append(*ancestorsIndexes, index)
-	nextChild, err := node.db.GetNode(node.childNodes[index])
+	nextChild, err := node.tbl.GetNode(node.childNodes[index])
 	if err != nil {
 		return -1, nil, err
 	}
@@ -301,12 +301,12 @@ func (n *Node) addItem(item *Item, insertionIndex int) {
 
 // Does the node require splitting.
 func (n *Node) isOverPopulated() bool {
-	return float32(n.nodeSize()) > n.db.options.MaxThreshold
+	return float32(n.nodeSize()) > n.tbl.options.MaxThreshold
 }
 
 // Does the node require consolidating.
 func (n *Node) isUnderPopulated() bool {
-	return float32(n.nodeSize()) < n.db.options.MinThreshold
+	return float32(n.nodeSize()) < n.tbl.options.MinThreshold
 }
 
 // split rebalances the tree after adding. After insertion the modified node has
@@ -327,21 +327,21 @@ func (n *Node) isUnderPopulated() bool {
 func (n *Node) split(nodeToSplit *Node, nodeToSplitIndex int) {
 	// The first index wehree min amount of bytes to populate a page is
 	// achieved. Then add 1 so it will be split one index after.
-	splitIndex := nodeToSplit.db.getSplitIndex(nodeToSplit)
+	splitIndex := nodeToSplit.tbl.getSplitIndex(nodeToSplit)
 
 	middleItem := nodeToSplit.items[splitIndex]
 	var newNode *Node
 
 	if nodeToSplit.isLeaf() {
-		newNode = n.db.NewNode(nodeToSplit.items[splitIndex+1:], []pageNum{})
-		n.db.WriteNode(newNode)
+		newNode = n.tbl.NewNode(nodeToSplit.items[splitIndex+1:], []pageNum{})
+		n.tbl.WriteNode(newNode)
 		nodeToSplit.items = nodeToSplit.items[:splitIndex]
 	} else {
-		newNode = n.db.NewNode(
+		newNode = n.tbl.NewNode(
 			nodeToSplit.items[splitIndex+1:],
 			nodeToSplit.childNodes[splitIndex+1:],
 		)
-		n.db.WriteNode(newNode)
+		n.tbl.WriteNode(newNode)
 		nodeToSplit.items = nodeToSplit.items[:splitIndex]
 		nodeToSplit.childNodes = nodeToSplit.childNodes[:splitIndex+1]
 	}
@@ -359,14 +359,14 @@ func (n *Node) split(nodeToSplit *Node, nodeToSplitIndex int) {
 		n.childNodes[nodeToSplitIndex+1] = newNode.pageNum
 	}
 
-	n.db.WriteNodes(n, nodeToSplit)
+	n.tbl.WriteNodes(n, nodeToSplit)
 }
 
 // removeItemFromLeaf removes an item from a leaf node. It means there is no
 // handling of child nodes.
 func (n *Node) removeItemFromLeaf(index int) {
 	n.items = append(n.items[:index], n.items[index+1:]...)
-	n.db.WriteNode(n)
+	n.tbl.WriteNode(n)
 }
 
 func (n *Node) removeItemFromInternal(index int) ([]int, error) {
@@ -383,7 +383,7 @@ func (n *Node) removeItemFromInternal(index int) ([]int, error) {
 	affectedNodes = append(affectedNodes, index)
 
 	// Starting from its left child, descend to the rightmost descendant.
-	aNode, err := n.db.GetNode(n.childNodes[index])
+	aNode, err := n.tbl.GetNode(n.childNodes[index])
 	if err != nil {
 		return nil, err
 	}
@@ -391,7 +391,7 @@ func (n *Node) removeItemFromInternal(index int) ([]int, error) {
 	for !aNode.isLeaf() {
 		// traversingIndex := len(n.childNodes) - 1
 		traversingIndex := len(aNode.childNodes) - 1
-		aNode, err = aNode.db.GetNode(aNode.childNodes[traversingIndex])
+		aNode, err = aNode.tbl.GetNode(aNode.childNodes[traversingIndex])
 		if err != nil {
 			return nil, err
 		}
@@ -402,7 +402,7 @@ func (n *Node) removeItemFromInternal(index int) ([]int, error) {
 	// which we just found.
 	n.items[index] = aNode.items[len(aNode.items)-1]
 	aNode.items = aNode.items[:len(aNode.items)-1]
-	n.db.WriteNodes(n, aNode)
+	n.tbl.WriteNodes(n, aNode)
 
 	return affectedNodes, nil
 }
@@ -413,7 +413,7 @@ func (n *Node) merge(bNode *Node, bNodeIndex int) error {
 	//	      /        |       \       ------>         /          \
 	//      a          b        c                     a            c
 	//     1,2         4        6,7                 1,2,3,4         6,7
-	aNode, err := n.db.GetNode(n.childNodes[bNodeIndex-1])
+	aNode, err := n.tbl.GetNode(n.childNodes[bNodeIndex-1])
 	if err != nil {
 		return err
 	}
@@ -430,12 +430,12 @@ func (n *Node) merge(bNode *Node, bNodeIndex int) error {
 		aNode.childNodes = append(aNode.childNodes, bNode.childNodes...)
 	}
 
-	err = n.db.WriteNodes(aNode, n)
+	err = n.tbl.WriteNodes(aNode, n)
 	if err != nil {
 		return err
 	}
 
-	err = n.db.DeleteNode(bNode.pageNum)
+	err = n.tbl.DeleteNode(bNode.pageNum)
 	if err != nil {
 		return err
 	}
@@ -456,26 +456,26 @@ func (n *Node) reblanceRemove(unbalancedNode *Node, unbalanacedNodeIndex int) er
 
 	// Right rotate
 	if unbalanacedNodeIndex != 0 {
-		leftNode, err := n.db.GetNode(pNode.childNodes[unbalanacedNodeIndex-1])
+		leftNode, err := n.tbl.GetNode(pNode.childNodes[unbalanacedNodeIndex-1])
 		if err != nil {
 			return err
 		}
 		if leftNode.canSpareAnElement() {
 			rotateRight(leftNode, pNode, unbalancedNode, unbalanacedNodeIndex)
-			n.db.WriteNodes(leftNode, pNode, unbalancedNode)
+			n.tbl.WriteNodes(leftNode, pNode, unbalancedNode)
 			return nil
 		}
 	}
 
 	// Left rotate
 	if unbalanacedNodeIndex != len(pNode.childNodes)-1 {
-		rightNode, err := n.db.GetNode(pNode.childNodes[unbalanacedNodeIndex+1])
+		rightNode, err := n.tbl.GetNode(pNode.childNodes[unbalanacedNodeIndex+1])
 		if err != nil {
 			return err
 		}
 		if rightNode.canSpareAnElement() {
 			rotateLeft(unbalancedNode, pNode, rightNode, unbalanacedNodeIndex)
-			n.db.WriteNodes(unbalancedNode, pNode, rightNode)
+			n.tbl.WriteNodes(unbalancedNode, pNode, rightNode)
 			return nil
 		}
 	}
@@ -485,7 +485,7 @@ func (n *Node) reblanceRemove(unbalancedNode *Node, unbalanacedNodeIndex int) er
 	// parameters, so the unbalanced node right sibling, will be merged into the
 	// unbalanced node.
 	if unbalanacedNodeIndex == 0 {
-		rightNode, err := n.db.GetNode(n.childNodes[unbalanacedNodeIndex+1])
+		rightNode, err := n.tbl.GetNode(n.childNodes[unbalanacedNodeIndex+1])
 		if err != nil {
 			return err
 		}

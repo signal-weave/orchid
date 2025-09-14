@@ -6,9 +6,11 @@ import (
 	"orchiddb/globals"
 )
 
-const MetaPageNum pageNum = 0 // The meta page's page number in each db file
-const FreelistPageNum pageNum = 1
-const RootNodePageNum pageNum = 2
+const (
+	MetaPageNum     pageNum = 0 // The meta page's page number in each db file
+	FreelistPageNum pageNum = 1
+	RootNodePageNum pageNum = 2
+)
 
 // The database file table of contents.
 // Contains page numbers for various non-user created pages, such as the
