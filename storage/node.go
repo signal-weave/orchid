@@ -84,7 +84,7 @@ func (n *Node) serializeToPage(p *page) []byte {
 
 	// marker
 	insertPageMarker(buf)
-	leftPos += 4
+	leftPos += globals.PageMarkerSize
 
 	// isLeaf
 	isLeaf := n.isLeaf()
@@ -168,7 +168,7 @@ func (n *Node) deserializeFromPage(p *page) {
 
 	// Read header
 	verifyPageMarker(buf)
-	leftPos += 4
+	leftPos += globals.PageMarkerSize
 
 	isLeaf := uint16(buf[leftPos])
 	leftPos += 1
@@ -438,15 +438,8 @@ func (n *Node) merge(bNode *Node, bNodeIndex int) error {
 		aNode.childNodes = append(aNode.childNodes, bNode.childNodes...)
 	}
 
-	err = n.tbl.WriteNodes(aNode, n)
-	if err != nil {
-		return err
-	}
-
-	err = n.tbl.DeleteNode(bNode.pageNum)
-	if err != nil {
-		return err
-	}
+	n.tbl.WriteNodes(aNode, n)
+	n.tbl.DeleteNode(bNode.pageNum)
 
 	return nil
 }

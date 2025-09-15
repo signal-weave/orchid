@@ -31,9 +31,6 @@ func NewEmptyPage(pagenum pageNum) *page {
 }
 
 // Verifies that the page has the magic marker at the beginning.
-// The 'magic marker' is 4 bytes that only orchid db pages should start with.
-// It would be a huge coincidence if another program wrote orchid's byte marker
-// at exactly the offset orchid is reading from.
 //
 // If the marker is not found, either a non-orchid page is being read or the
 // pages have been offset or drifted, resulting in database corruption.
@@ -46,7 +43,6 @@ func verifyPageMarker(buf []byte) {
 }
 
 // insertPageMarker appends globals.PageMarker to the beginning of a page.
-// See verifyPageMarker doc for more details.
 func insertPageMarker(buf []byte) {
 	copy(buf[0:4], globals.PageMarker[:])
 }

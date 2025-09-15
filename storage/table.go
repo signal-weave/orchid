@@ -13,9 +13,10 @@ import (
 type Table struct {
 	options Options
 
-	pager    *Pager
-	Meta     *meta
+	meta     *meta
 	freelist *freelist
+
+	Txn *Transaction
 }
 
 // -------Table File Management-------------------------------------------------
@@ -43,7 +44,7 @@ func createTable(path string, options *Options) (*Table, error) {
 	// ---- write meta page table of contents
 	m := newMeta()
 	fr := newFreelist()
-	fr.MaxPage = m.RootPage
+	fr.MaxPage = m.RootPageNum
 
 	// ---- write meta (page 0)
 	metaPg := NewEmptyPage(MetaPageNum)
@@ -54,7 +55,7 @@ func createTable(path string, options *Options) (*Table, error) {
 	}
 
 	// ---- write freelist (page 1)
-	flPg := NewEmptyPage(m.FreelistPage)
+	flPg := NewEmptyPage(m.FreelistPageNum)
 	fr.serializeToPage(flPg)
 
 	if err := pager.WritePage(flPg); err != nil {
@@ -67,14 +68,19 @@ func createTable(path string, options *Options) (*Table, error) {
 		return nil, err
 	}
 
-	tbl := Table{options: *options, pager: pager, Meta: m, freelist: fr}
+	tbl := Table{
+		options:  *options,
+		meta:     m,
+		freelist: fr,
+		Txn:      NewTransaction(pager),
+	}
 
 	root := NewEmptyNode()
-	root.pageNum = m.RootPage
-	if err := tbl.WriteNode(root); err != nil {
-		pager.Close()
-		return nil, fmt.Errorf("write root: %w", err)
-	}
+	root.pageNum = m.RootPageNum
+	tbl.WriteNode(root)
+	tbl.Txn.meta = m
+	tbl.Txn.freelist = fr
+	tbl.Txn.Commit()
 
 	return &tbl, nil
 }
@@ -97,7 +103,7 @@ func openTable(path string, options *Options) (*Table, error) {
 	m.deserializeFromPage(metaPg)
 
 	// ---- read freelist (meta.freelistPage)
-	flPg, err := pager.ReadPage(m.FreelistPage)
+	flPg, err := pager.ReadPage(m.FreelistPageNum)
 	if err != nil {
 		_ = pager.Close()
 		return nil, fmt.Errorf("read freelist: %w", err)
@@ -106,11 +112,16 @@ func openTable(path string, options *Options) (*Table, error) {
 	fr := newFreelist()
 	fr.deserializeFromPage(flPg)
 
-	return &Table{options: *options, pager: pager, Meta: m, freelist: fr}, nil
+	return &Table{
+		options:  *options,
+		meta:     m,
+		freelist: fr,
+		Txn:      NewTransaction(pager),
+	}, nil
 }
 
 func (tbl *Table) Close() error {
-	return tbl.pager.Close()
+	return tbl.Txn.pager.Close()
 }
 
 // -------Page Management-------------------------------------------------------
@@ -120,37 +131,24 @@ func (tbl *Table) AllocatePage() *page {
 	pn := tbl.freelist.GetNextPage()
 
 	// Persist freelist after allocation
-	flPg := NewEmptyPage(tbl.Meta.FreelistPage)
-	tbl.freelist.serializeToPage(flPg)
+	tbl.Txn.freelist = tbl.freelist
 
 	newPage := NewEmptyPage(pn)
 	return newPage
 }
 
 // ReleasePage marks a page as free and persists the freelist.
-func (tbl *Table) ReleasePage(pn pageNum) error {
+func (tbl *Table) ReleasePage(pn pageNum) {
 	tbl.freelist.ReleasePage(pn)
-	return tbl.WriteFreelist()
+	tbl.WriteFreelist()
 }
 
-func (tbl *Table) WriteFreelist() error {
-	pg := NewEmptyPage(tbl.Meta.FreelistPage)
-	tbl.freelist.serializeToPage(pg)
-	err := tbl.pager.WritePage(pg)
-	if err != nil {
-		return err
-	}
-	return tbl.pager.Sync()
+func (tbl *Table) WriteFreelist() {
+	tbl.Txn.freelist = tbl.freelist
 }
 
-func (tbl *Table) WriteMeta() error {
-	pg := NewEmptyPage(MetaPageNum)
-	tbl.Meta.serializeToPage(pg)
-	err := tbl.pager.WritePage(pg)
-	if err != nil {
-		return err
-	}
-	return tbl.pager.Sync()
+func (tbl *Table) WriteMeta() {
+	tbl.Txn.meta = tbl.meta
 }
 
 // -------Node IO---------------------------------------------------------------
@@ -160,13 +158,20 @@ func (tbl *Table) NewNode(items []*Item, childNodes []pageNum) *Node {
 	node.items = items
 	node.childNodes = childNodes
 	node.pageNum = tbl.freelist.GetNextPage()
+	tbl.Txn.freelist = tbl.freelist // be sure to stage FL after updating
 	node.tbl = tbl
 
 	return node
 }
 
 func (tbl *Table) GetNode(pageNum pageNum) (*Node, error) {
-	pg, err := tbl.pager.ReadPage(pageNum)
+	n, exists := tbl.Txn.dirtyPages[pageNum]
+	if exists {
+		// No point reading if node has been updated but yet to be written.
+		return n, nil
+	}
+
+	pg, err := tbl.Txn.pager.ReadPage(pageNum)
 	if err != nil {
 		return nil, err
 	}
@@ -190,7 +195,7 @@ func (tbl *Table) GetNode(pageNum pageNum) (*Node, error) {
 //
 // For [0,1,0] -> p,b,e
 func (tbl *Table) GetNodes(indexes []int) ([]*Node, error) {
-	root, err := tbl.GetNode(tbl.Meta.RootPage)
+	root, err := tbl.GetNode(tbl.meta.RootPageNum)
 	if err != nil {
 		return nil, err
 	}
@@ -207,8 +212,8 @@ func (tbl *Table) GetNodes(indexes []int) ([]*Node, error) {
 	return nodes, nil
 }
 
-// Serializes the given node n into a page, writes it out and syncs.
-func (tbl *Table) WriteNode(n *Node) error {
+// Serializes the given node n into a page, then add to current transaction.
+func (tbl *Table) WriteNode(n *Node) {
 	var pg *page
 
 	if n.pageNum == 0 {
@@ -219,31 +224,20 @@ func (tbl *Table) WriteNode(n *Node) error {
 		pg = NewEmptyPage(n.pageNum)
 	}
 
-	n.serializeToPage(pg)
-	if err := tbl.pager.WritePage(pg); err != nil {
-		return err
-	}
-
-	return tbl.pager.Sync()
+	tbl.Txn.appendPage(n)
 }
 
-// Serializes the given nodes into pages and writes them out and syncs.
-// Returns error of the first node to unsucessfully write if one is encountered.
-func (tbl *Table) WriteNodes(nodes ...*Node) error {
+// Serializes the given nodes into pages and adds them to current transaction.
+func (tbl *Table) WriteNodes(nodes ...*Node) {
 	for _, n := range nodes {
-		err := tbl.WriteNode(n)
-		if err != nil {
-			return err
-		}
+		tbl.WriteNode(n)
 	}
-
-	return nil
 }
 
 // Mark the pageNum as freed, then persist the freelist page to disk.
-func (tbl *Table) DeleteNode(pageNum pageNum) error {
+func (tbl *Table) DeleteNode(pageNum pageNum) {
 	tbl.freelist.ReleasePage(pageNum)
-	return tbl.WriteFreelist()
+	tbl.WriteFreelist()
 }
 
 // -------Node Tree Balancing---------------------------------------------------
@@ -273,7 +267,7 @@ func (tbl *Table) getSplitIndex(node *Node) int {
 
 // Get returns an item according to the given key by performing binary search.
 func (tbl *Table) Get(key []byte) (*Item, error) {
-	n, err := tbl.GetNode(tbl.Meta.RootPage)
+	n, err := tbl.GetNode(tbl.meta.RootPageNum)
 	if err != nil {
 		return nil, err
 	}
@@ -299,7 +293,7 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 	i := NewItem(key, value)
 
 	// Root node is created with database.
-	root, err := tbl.GetNode(tbl.Meta.RootPage)
+	root, err := tbl.GetNode(tbl.meta.RootPageNum)
 
 	// Find the path to the node where the insertion should happen
 	insertionIdx, nodeToInsertIn, ancestorIdxs, err := root.FindKey(i.Key, false)
@@ -318,9 +312,7 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 	}
 
 	// Persist the modified leaf even if no split occurs
-	if err := tbl.WriteNode(nodeToInsertIn); err != nil {
-		return err
-	}
+	tbl.WriteNode(nodeToInsertIn)
 
 	ancestors, err := tbl.GetNodes(ancestorIdxs)
 	if err != nil {
@@ -345,12 +337,9 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 		newRoot.split(rootNode, 0)
 
 		// commit newly created root
-		err = tbl.WriteNode(newRoot)
-		if err != nil {
-			return err
-		}
+		tbl.WriteNode(newRoot)
 
-		tbl.Meta.RootPage = newRoot.pageNum
+		tbl.meta.RootPageNum = newRoot.pageNum
 		tbl.WriteMeta()
 	}
 
@@ -367,7 +356,7 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 // level shorter.
 func (tbl *Table) Del(key []byte) error {
 	// Find the path to the node where the deletion should happen.
-	rootNode, err := tbl.GetNode(tbl.Meta.RootPage)
+	rootNode, err := tbl.GetNode(tbl.meta.RootPageNum)
 	if err != nil {
 		return err
 	}
@@ -414,8 +403,8 @@ func (tbl *Table) Del(key []byte) error {
 	// it because we ignore it.
 	if len(rootNode.items) == 0 && len(rootNode.childNodes) > 0 {
 		// Mark new root page in meta page and persist it to disk.
-		tbl.Meta.RootPage = ancestors[1].pageNum
-		return tbl.WriteMeta()
+		tbl.meta.RootPageNum = ancestors[1].pageNum
+		tbl.WriteMeta()
 	}
 
 	return nil
