@@ -62,7 +62,7 @@ func (n *Node) canSpareAnElement() bool {
 // -------Serialization---------------------------------------------------------
 
 // Converts page struct p into a serialized byte array for psersistent storage.
-func (n *Node) serializeToPage(p *page) []byte {
+func (n *Node) serializeToPage(p *page) {
 	// We use slotted pages for storing data in the page. This means the actual
 	// keys and values (the cells) are appended to right of the page whereas
 	// offsets have a fixed size and are appended from the left.
@@ -76,14 +76,13 @@ func (n *Node) serializeToPage(p *page) []byte {
 	// | Header |   offset /	 pointer	  offset   .... |    data    ..... |
 	// -------------------------------------------------------------------------
 
-	buf := p.contents
 	leftPos := 0
-	rightPos := len(buf) - 1
+	rightPos := len(p.contents) - 1
 
 	// Add page header: marker, isLeaf, key-value pairs count
 
 	// marker
-	insertPageMarker(buf)
+	insertPageMarker(p.contents)
 	leftPos += globals.PageMarkerSize
 
 	// isLeaf
@@ -92,11 +91,11 @@ func (n *Node) serializeToPage(p *page) []byte {
 	if isLeaf {
 		bitSetVar = 1
 	}
-	buf[leftPos] = byte(bitSetVar)
+	p.contents[leftPos] = byte(bitSetVar)
 	leftPos += 1
 
 	// key-value pairs count
-	binary.LittleEndian.PutUint16(buf[leftPos:], uint16(len(n.items)))
+	binary.LittleEndian.PutUint16(p.contents[leftPos:], uint16(len(n.items)))
 	leftPos += 2
 
 	for i, item := range n.items {
@@ -104,7 +103,7 @@ func (n *Node) serializeToPage(p *page) []byte {
 			childNode := n.childNodes[i]
 
 			// Write the child page as a fixed size of 8 bytes
-			binary.LittleEndian.PutUint64(buf[leftPos:], uint64(childNode))
+			binary.LittleEndian.PutUint64(p.contents[leftPos:], uint64(childNode))
 			leftPos += globals.PageNumSize
 		}
 
@@ -114,39 +113,37 @@ func (n *Node) serializeToPage(p *page) []byte {
 		// -------write offset--------------------------------------------------
 
 		offset := rightPos - klen - vlen - 2
-		binary.LittleEndian.PutUint16(buf[leftPos:], uint16(offset))
+		binary.LittleEndian.PutUint16(p.contents[leftPos:], uint16(offset))
 		leftPos += 2
 
 		// Starting from the right postion, we will move backwards the length of
 		// the value, then write the value from that position forwards into the
 		// buffer.
 		rightPos -= vlen
-		copy(buf[rightPos:], item.Value)
+		copy(p.contents[rightPos:], item.Value)
 
 		// Then move the right position backwards 1 byte to insert the length of
 		// the value.
 		rightPos -= 1
-		buf[rightPos] = byte(vlen)
+		p.contents[rightPos] = byte(vlen)
 
 		// Then we will move the right position backwards the length of the key,
 		// then write the key from that position forwards into the buffer.
 		rightPos -= klen
-		copy(buf[rightPos:], item.Key)
+		copy(p.contents[rightPos:], item.Key)
 
 		// Then move the right position backwards 1 byte to insert the length of
 		// the key.
 		rightPos -= 1
-		buf[rightPos] = byte(klen)
+		p.contents[rightPos] = byte(klen)
 	}
 
 	if !isLeaf {
 		// Write the last child node
 		lastChildNode := n.childNodes[len(n.childNodes)-1]
 		// Write the child page as a fixed size of 8 bytes
-		binary.LittleEndian.PutUint64(buf[leftPos:], uint64(lastChildNode))
+		binary.LittleEndian.PutUint64(p.contents[leftPos:], uint64(lastChildNode))
 	}
-
-	return buf
 }
 
 // Converts a page struct into a Node struct.
@@ -162,49 +159,48 @@ func (n *Node) deserializeFromPage(p *page) {
 	}
 
 	n.pageNum = p.pageNum
-	buf := p.contents
 
 	leftPos := 0
 
 	// Read header
-	verifyPageMarker(buf)
+	verifyPageMarker(p.contents)
 	leftPos += globals.PageMarkerSize
 
-	isLeaf := uint16(buf[leftPos])
+	isLeaf := uint16(p.contents[leftPos])
 	leftPos += 1
 
-	itemsCount := int(binary.LittleEndian.Uint16(buf[leftPos : leftPos+2]))
+	itemsCount := int(binary.LittleEndian.Uint16(p.contents[leftPos : leftPos+2]))
 	leftPos += 2
 
 	// Read body
 	for range itemsCount {
 		if isLeaf == 0 { // False
-			pn := binary.LittleEndian.Uint64(buf[leftPos:])
+			pn := binary.LittleEndian.Uint64(p.contents[leftPos:])
 			leftPos += globals.PageNumSize
 			n.childNodes = append(n.childNodes, pageNum(pn))
 		}
 
 		// Read offset
-		offset := binary.LittleEndian.Uint16(buf[leftPos:])
+		offset := binary.LittleEndian.Uint16(p.contents[leftPos:])
 		leftPos += 2
 
-		klen := uint16(buf[int(offset)])
+		klen := uint16(p.contents[int(offset)])
 		offset += 1
 
-		key := buf[offset : offset+klen]
+		key := p.contents[offset : offset+klen]
 		offset += klen
 
-		vlen := uint16(buf[int(offset)])
+		vlen := uint16(p.contents[int(offset)])
 		offset += 1
 
-		value := buf[offset : offset+vlen]
+		value := p.contents[offset : offset+vlen]
 		offset += vlen
 		n.items = append(n.items, NewItem(key, value))
 	}
 
 	if isLeaf == 0 { // False
 		// Read the last child node
-		pageNum := pageNum(binary.LittleEndian.Uint64(buf[leftPos:]))
+		pageNum := pageNum(binary.LittleEndian.Uint64(p.contents[leftPos:]))
 		n.childNodes = append(n.childNodes, pageNum)
 	}
 }

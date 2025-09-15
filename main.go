@@ -42,7 +42,7 @@ func test() {
 	for k, v := range entries {
 		db.Put([]byte(k), []byte(v))
 	}
-	db.Txn.Commit()
+	db.Commit()
 
 	for _, v := range []string{"Key1", "Key2", "Key3", "Key4", "Key5", "Key6"} {
 		item, _ := db.Get([]byte(v))
@@ -50,11 +50,10 @@ func test() {
 	}
 
 	_ = db.Del([]byte("Key1"))
-	db.Txn.Commit()
+	db.WriteFreelist()
+	db.Commit()
 	item, _ := db.Get([]byte("Key1"))
 
-	db.WriteFreelist()
-	db.Txn.Commit()
 	fmt.Printf("item is: %+v\n", item)
 	_ = db.Close()
 }

@@ -29,31 +29,32 @@ func newMeta() *meta {
 }
 
 // serializeToPage writes the meta's contents into page p.
-func (m *meta) serializeToPage(p *page) {
+func (m *meta) serializeToPage() *page {
+	p := NewEmptyPage(MetaPageNum)
 	pos := 0
-	buf := p.contents
 
-	insertPageMarker(buf)
+	insertPageMarker(p.contents)
 	pos += globals.PageMarkerSize
 
-	binary.LittleEndian.PutUint64(buf[pos:], uint64(m.FreelistPageNum))
+	binary.LittleEndian.PutUint64(p.contents[pos:], uint64(m.FreelistPageNum))
 	pos += globals.PageNumSize
 
-	binary.LittleEndian.PutUint64(buf[pos:], uint64(m.RootPageNum))
+	binary.LittleEndian.PutUint64(p.contents[pos:], uint64(m.RootPageNum))
 	pos += globals.PageNumSize
+
+	return p
 }
 
 // deserializeFromPage constructs a new meta from the contents of page p.
 func (m *meta) deserializeFromPage(p *page) {
 	pos := 0
-	buf := p.contents
 
-	verifyPageMarker(buf)
+	verifyPageMarker(p.contents)
 	pos += globals.PageMarkerSize
 
-	m.FreelistPageNum = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
+	m.FreelistPageNum = pageNum(binary.LittleEndian.Uint64(p.contents[pos:]))
 	pos += globals.PageNumSize
 
-	m.RootPageNum = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
+	m.RootPageNum = pageNum(binary.LittleEndian.Uint64(p.contents[pos:]))
 	pos += globals.PageNumSize
 }

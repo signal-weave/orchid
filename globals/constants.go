@@ -35,10 +35,10 @@ const (
 // at exactly the offset orchid is reading from.
 var PageMarker = []byte{PM_Z, PM_T, PM_C, PM_H}
 
-// Although not a constant, WalMarker is an array of constants and is orchidd's
-// successful write-ahead-log marker.
+// Although not a constant, WalSuccessMarker is an array of constants and is
+// orchidd's successful write-ahead-log marker.
 //
-// If this value is not found at the end of a write-head-log (WAL), then an
+// If this value is not found at the end of a write-head-log (WAL) file, then an
 // unexpected shutdown happened durring WAL creation, and the log should be
 // ignored.
 //
@@ -46,8 +46,9 @@ var PageMarker = []byte{PM_Z, PM_T, PM_C, PM_H}
 // either fully happen or not at all.
 //
 // If a WAL does not contain a marker, then the transaction is discarded
-// entirely.
-var WalMarker = []byte{WM_E, WM_X, WM_I, WM_T}
+// entirely as we then cannot know what state the user intenteded to update the
+// database to.
+var WalSuccessMarker = []byte{WM_E, WM_X, WM_I, WM_T}
 
 // -------Misc------------------------------------------------------------------
 const (

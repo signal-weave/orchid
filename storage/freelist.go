@@ -53,50 +53,49 @@ func (fr *freelist) ReleasePage(page pageNum) {
 // -------Serialization---------------------------------------------------------
 
 // serializeToPage writes the freelist's contents into page p.
-func (fr *freelist) serializeToPage(p *page) []byte {
-	buf := p.contents
+func (fr *freelist) serializeToPage() *page {
+	p := NewEmptyPage(FreelistPageNum)
 	pos := 0
 
 	// Page marker
-	insertPageMarker(buf)
+	insertPageMarker(p.contents)
 	pos += globals.PageMarkerSize
 
 	// MaxPage count
-	binary.LittleEndian.PutUint64(buf[pos:], uint64(fr.MaxPage))
+	binary.LittleEndian.PutUint64(p.contents[pos:], uint64(fr.MaxPage))
 	pos += 8
 
 	// released pages count
-	binary.LittleEndian.PutUint16(buf[pos:], uint16(len(fr.ReleasedPages)))
+	binary.LittleEndian.PutUint16(p.contents[pos:], uint16(len(fr.ReleasedPages)))
 	pos += 2
 
 	for _, page := range fr.ReleasedPages {
-		binary.LittleEndian.PutUint64(buf[pos:], uint64(page))
+		binary.LittleEndian.PutUint64(p.contents[pos:], uint64(page))
 		pos += globals.PageNumSize
 	}
 
-	return buf
+	return p
 }
 
 // deserializeFromPage constructs a new freelist from the contents of page p.
 func (fr *freelist) deserializeFromPage(p *page) {
-	buf := p.contents
 	pos := 0
 	fr.ReleasedPages = fr.ReleasedPages[:0] // reset
 
 	// Page marker
-	verifyPageMarker(buf)
+	verifyPageMarker(p.contents)
 	pos += globals.PageMarkerSize
 
 	// Max page count
-	fr.MaxPage = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
+	fr.MaxPage = pageNum(binary.LittleEndian.Uint64(p.contents[pos:]))
 	pos += 8
 
 	// Release page count
-	releasedPagesCount := int(binary.LittleEndian.Uint16(buf[pos:]))
+	releasedPagesCount := int(binary.LittleEndian.Uint16(p.contents[pos:]))
 	pos += 2
 
 	for range releasedPagesCount {
-		page := pageNum(binary.LittleEndian.Uint64(buf[pos:]))
+		page := pageNum(binary.LittleEndian.Uint64(p.contents[pos:]))
 		pos += globals.PageNumSize
 		fr.ReleasedPages = append(fr.ReleasedPages, page)
 	}
