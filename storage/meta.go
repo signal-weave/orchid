@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MetaPageNum     pageNum = 0 // The meta page's page number in each db file
+	MetaPageNum     pageNum = 0
 	FreelistPageNum pageNum = 1
 	RootNodePageNum pageNum = 2
 )

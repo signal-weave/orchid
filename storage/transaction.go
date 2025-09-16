@@ -1,7 +1,9 @@
 package storage
 
 import (
+	"fmt"
 	"orchiddb/filestamp"
+	"os"
 )
 
 // A Transaction is the sum of all pages to update from a user action.
@@ -26,21 +28,33 @@ func (t *Transaction) appendPage(n *Node) {
 	t.dirtyPages[n.pageNum] = n
 }
 
+// Commit makes a WAL file before actually committing the changes to the DB.
+// If power loss happened mid WAL creation - transaction is discarded on
+// db reboot.
+// If power loss happened mid db commit - transaction is replayed via WAL file
+// on db reboot.
+// Finally WAL file is deleted as to not confuse system on reboot an dconserve
+// disk space.
 func (t *Transaction) Commit() error {
-	err := t.writeLog()
-	if err != nil {
+	logFile := filestamp.FileNameMonotonic("db", ".log")
+	if err := t.writeLog(logFile); err != nil {
 		return err
 	}
 
-	err = t.writeToTable()
-	if err != nil {
+	if err := t.writeToTable(); err != nil {
+		return err
+	}
+
+	if err := os.Remove(logFile); err != nil {
+		fmt.Println("[ERROR]", err)
 		return err
 	}
 
 	return nil
 }
 
-func (t *Transaction) writeLog() error {
+// writeLog writes the write-ahead-log for the updated pages in the transaction.
+func (t *Transaction) writeLog(path string) error {
 	if t.meta != nil {
 		mPg := t.meta.serializeToPage()
 		t.wal.appendPage(mPg)
@@ -57,15 +71,10 @@ func (t *Transaction) writeLog() error {
 		}
 	}
 
-	logName := filestamp.FileNameMonotonic("db", ".log")
-	err := t.wal.WriteLog(logName)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return t.wal.WriteLog(path)
 }
 
+// writeToTable commits the atual updated pages to the .db file.
 func (t *Transaction) writeToTable() error {
 	for _, p := range t.wal.pages {
 		err := t.pager.WritePage(p)

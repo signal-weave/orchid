@@ -6,11 +6,13 @@ package globals
 // -----------------------------------------------------------------------------
 
 // -------Storage---------------------------------------------------------------
+
 const (
 	NodeHeaderSize = 3
 	PageNumSize    = 8 // The size of a page's number in bytes
 
 	// -------Page Marker-------------------------------------------------------
+
 	PageMarkerSize = 4 // The size of a page marker in bytes
 
 	PM_Z = byte('z')
@@ -19,6 +21,7 @@ const (
 	PM_H = byte('h')
 
 	// -------WAL Marker--------------------------------------------------------
+
 	WalMarkerSize = 4 // The size of a write-ahead-log marker in bytes
 
 	WM_E = byte('E')
@@ -51,6 +54,7 @@ var PageMarker = []byte{PM_Z, PM_T, PM_C, PM_H}
 var WalSuccessMarker = []byte{WM_E, WM_X, WM_I, WM_T}
 
 // -------Misc------------------------------------------------------------------
+
 const (
 	Developer = "Signal Weave"
 )

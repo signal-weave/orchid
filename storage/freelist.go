@@ -15,6 +15,7 @@ const metaPage = 0
 // using the space of a freed page or allocating a new one.
 type freelist struct {
 	// Holds the maximum page allocated. maxpage*pageSize = filesize
+	// (excluding the freelist page and meta page).
 	MaxPage pageNum
 
 	// Pages that were previously allocated but are now free
