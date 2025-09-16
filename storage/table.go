@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"orchiddb/globals"
 	"os"
+	"sync"
 )
 
 // Table is the databse struct that uses a pager to read/write/create pages and
 // orchestrates meta, freelist, and node page tyeps.
 // Creating and closing a table opens and closes a stream to the table file.
 type Table struct {
+	rwMutex sync.RWMutex
 	options Options
 
 	meta     *meta
@@ -66,6 +68,7 @@ func createTable(path string, options *Options) (*Table, error) {
 	}
 
 	tbl := Table{
+		rwMutex:  sync.RWMutex{},
 		options:  *options,
 		meta:     m,
 		freelist: fr,
@@ -112,6 +115,7 @@ func openTable(path string, options *Options) (*Table, error) {
 	fr.deserializeFromPage(flPg)
 
 	return &Table{
+		rwMutex:  sync.RWMutex{},
 		options:  *options,
 		meta:     m,
 		freelist: fr,
@@ -270,6 +274,9 @@ func (tbl *Table) getSplitIndex(node *Node) int {
 
 // Get returns an item according to the given key by performing binary search.
 func (tbl *Table) Get(key []byte) (*Item, error) {
+	tbl.rwMutex.RLock()
+	defer tbl.rwMutex.RUnlock()
+
 	n, err := tbl.GetNode(tbl.meta.RootPageNum)
 	if err != nil {
 		return nil, err
@@ -293,6 +300,9 @@ func (tbl *Table) Get(key []byte) (*Item, error) {
 // then a new root of a new layer is created and the created nodes from the
 // split are added as children.
 func (tbl *Table) Put(key []byte, value []byte) error {
+	tbl.rwMutex.Lock()
+	defer tbl.rwMutex.Unlock()
+
 	i := NewItem(key, value)
 
 	// Root node is created with database.
@@ -358,6 +368,9 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 // without items after a split, then the root is removed and the tree is one
 // level shorter.
 func (tbl *Table) Del(key []byte) error {
+	tbl.rwMutex.Lock()
+	defer tbl.rwMutex.Unlock()
+
 	// Find the path to the node where the deletion should happen.
 	rootNode, err := tbl.GetNode(tbl.meta.RootPageNum)
 	if err != nil {

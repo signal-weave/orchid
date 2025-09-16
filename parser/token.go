@@ -13,6 +13,7 @@ const (
 
 	IDENT = "IDENT"
 
+	// Delimiters
 	LPAREN = "("
 	RPAREN = ")"
 	COMMA  = ","
