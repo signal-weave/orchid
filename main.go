@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"orchiddb/globals"
 	"orchiddb/parser"
 	"orchiddb/storage"
 	"orchiddb/system"
+	"orchiddb/system/startup"
 )
 
 var majorVersion int = 0 // Proud version
@@ -14,6 +17,8 @@ var patchVersion int = 0 // Sucky verison
 
 func main() {
 	system.PrintStartupText(majorVersion, minorVersion, patchVersion)
+
+	startup.Startup(os.Args[1:])
 
 	test()
 	test2()
