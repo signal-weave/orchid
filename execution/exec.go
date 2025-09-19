@@ -26,11 +26,11 @@ func CloseAllTables() {
 }
 
 func PrintWorkers() {
-	fmt.Println("---Current Loaded Tables----------")
+	fmt.Println("-------Current Loaded Tables-------")
 	for k := range LoadedWorkers {
 		fmt.Println(k)
 	}
-	fmt.Println("----------------------------------")
+	fmt.Println("-----------------------------------")
 }
 
 // ExecuteCommand executes the corresponding function for the given cmd.
