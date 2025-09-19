@@ -16,26 +16,38 @@ type TableWorker struct {
 	// Replace with type to receive. Must be pointer, but to any type.
 	in chan *parser.Command
 
-	tbl *storage.Table
-
+	tbl    *storage.Table
 	IsIdle bool // Is the loop paused?
 }
 
 func NewWorker(tbl *storage.Table) *TableWorker {
 	worker := &TableWorker{
 		tbl:    tbl,
+		in:     make(chan *parser.Command, 128),
 		IsIdle: true,
 	}
+
 	LoadedWorkers[tbl.Name] = worker
+	PrintWorkers()
 
 	return worker
 }
 
 // Start starts the worker loop on a go routine.
-func (tw *TableWorker) Start() { tw.IsIdle = false; go tw.loop() }
+func (tw *TableWorker) Start() {
+	if !tw.IsIdle {
+		return // already started, prevent double goroutines.
+	}
+
+	tw.IsIdle = false
+	go tw.loop()
+}
 
 // Stop closes the in channel and then the worker is idled.
 func (tw *TableWorker) Stop() { close(tw.in); tw.IsIdle = true }
+
+// Close closes the worker's table, returns any error.
+func (tw *TableWorker) Close() error { return tw.tbl.Close() }
 
 // The primary logic for handling parsed commands and turning them into queried
 // database data.
@@ -66,19 +78,36 @@ func (tw *TableWorker) executeCommand(cmd *parser.Command) error {
 }
 
 func (tw *TableWorker) get(cmd *parser.GetCommand) error {
-	item, err := tw.tbl.Get([]byte(cmd.Key))
+	var item *storage.Item
+	var err error
+	var resp []byte
+
+	item, err = tw.tbl.Get([]byte(cmd.Key))
 	if err != nil {
 		return err
 	}
+	if item == nil {
+		resp = []byte("nil")
+	} else {
+		resp = item.Value
+	}
 
-	_, err = cmd.Conn.Write(item.Value)
+	_, err = cmd.Conn.Write(resp)
 	return err
 }
 
 func (tw *TableWorker) put(cmd *parser.PutCommand) error {
-	return tw.tbl.Put([]byte(cmd.Key), []byte(cmd.Value))
+	err := tw.tbl.Put([]byte(cmd.Key), []byte(cmd.Value))
+	if err != nil {
+		return err
+	}
+	return tw.tbl.Txn.Commit()
 }
 
 func (tw *TableWorker) del(cmd *parser.DelCommand) error {
-	return tw.tbl.Del([]byte(cmd.Key))
+	err := tw.tbl.Del([]byte(cmd.Key))
+	if err != nil {
+		return err
+	}
+	return tw.tbl.Txn.Commit()
 }

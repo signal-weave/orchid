@@ -3,10 +3,11 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"orchiddb/globals"
-	"orchiddb/parser"
-	"orchiddb/storage"
+	"orchiddb/execution"
+	"orchiddb/server"
 	"orchiddb/system"
 	"orchiddb/system/startup"
 )
@@ -20,68 +21,29 @@ func main() {
 
 	startup.Startup(os.Args[1:])
 
-	test()
-	test2()
+	go startServer()
+	awaitSigterm()
 }
 
-func test() {
-	globals.MinFillPercent = 0.0125
-	globals.MaxFillPercent = 0.025
-
-	db, err := storage.GetTable("db.db")
+func startServer() {
+	server, err := server.NewServer()
 	if err != nil {
-		panic(err)
+		fmt.Println("server start error:", err)
+		os.Exit(2)
+		select {}
 	}
-	defer db.Close()
-
-	entries := map[string]string{
-		"Key1": "Value1",
-		"Key2": "Value2",
-		"Key3": "Value3",
-		"Key4": "Value4",
-		"Key5": "Value5",
-		"Key6": "Value6",
+	if err := server.Run(); err != nil {
+		fmt.Println("server runtime error:", err)
 	}
-
-	for k, v := range entries {
-		db.Put([]byte(k), []byte(v))
-	}
-	db.Commit()
-
-	for _, v := range []string{"Key1", "Key2", "Key3", "Key4", "Key5", "Key6"} {
-		item, _ := db.Get([]byte(v))
-		fmt.Printf("key is: %s, value is: %s\n", item.Key, item.Value)
-	}
-
-	_ = db.Del([]byte("Key1"))
-	db.WriteFreelist()
-	db.Commit()
-	item, _ := db.Get([]byte("Key1"))
-
-	fmt.Printf("item is: %+v\n", item)
-	_ = db.Close()
 }
 
-func test2() {
+func awaitSigterm() {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, os.Interrupt, syscall.SIGTERM)
 
-	makeInput := "MAKE(TestTable)"
-	putInput := "PUT(TestTable, Key7, Value7)"
-	getInput := "GET(TestTable, Key7)"
-	delInput := "DEL(TestTable, Key7)"
-	dropInput := "DROP(TestTable)"
+	sig := <-sigs
+	fmt.Println("received signal:", sig)
+	fmt.Println("shutting down...")
 
-	inputs := []string{makeInput, putInput, getInput, delInput, dropInput}
-
-	for _, v := range inputs {
-		l := parser.NewLexer(v)
-		p := parser.NewParser(l)
-		cmd := p.ParseCommand()
-		if len(p.Errors()) != 0 {
-			for _, e := range p.Errors() {
-				fmt.Println("[ERROR]", e)
-			}
-		} else {
-			fmt.Println(cmd.Command.String())
-		}
-	}
+	execution.CloseAllTables()
 }

@@ -11,7 +11,7 @@ import (
 // performRecoveryCheck checks for any table WAL files and runs a recovery
 // attempt from them.
 func performRecoveryCheck() {
-	tableFiles := getTablePaths()
+	tableFiles := paths.GetTablePaths()
 	if tableFiles == nil {
 		return
 	}

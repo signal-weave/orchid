@@ -126,17 +126,20 @@ func openTable(path string, options *Options) (*Table, error) {
 		_ = pager.Close()
 		return nil, fmt.Errorf("read freelist: %w", err)
 	}
+	fl := newFreelist()
+	fl.deserializeFromPage(flPg)
 
-	fr := newFreelist()
-	fr.deserializeFromPage(flPg)
+	txn := NewTransaction(pager)
+	txn.meta = m
+	txn.freelist = fl
 
 	return &Table{
 		Name:     tableName,
 		rwMutex:  sync.RWMutex{},
 		options:  *options,
 		meta:     m,
-		freelist: fr,
-		Txn:      NewTransaction(pager),
+		freelist: fl,
+		Txn:      txn,
 	}, nil
 }
 

@@ -1,6 +1,10 @@
 package parser
 
-import "fmt"
+import (
+	"fmt"
+	"orchiddb/globals"
+	"strings"
+)
 
 type (
 	parseCmdFn func() Node
@@ -140,7 +144,7 @@ func (p *Parser) parseMakeCommand() Node {
 
 	p.nextToken() // Move passed LPAREN to TABLE
 
-	cmd.Table = p.curToken.Literal
+	cmd.Table = NormalizeTableKey(p.curToken.Literal)
 
 	if !p.expectPeek(RPAREN) {
 		return nil
@@ -163,7 +167,7 @@ func (p *Parser) parseDropCommand() Node {
 
 	p.nextToken() // Move passed LPAREN to TABLE
 
-	cmd.Table = p.curToken.Literal
+	cmd.Table = NormalizeTableKey(p.curToken.Literal)
 
 	if !p.expectPeek(RPAREN) {
 		return nil
@@ -186,7 +190,7 @@ func (p *Parser) parseGetCommand() Node {
 		return nil
 	}
 
-	cmd.Table = args[0].String()
+	cmd.Table = NormalizeTableKey(args[0].String())
 	cmd.Key = args[1].String()
 
 	return cmd
@@ -235,7 +239,7 @@ func (p *Parser) parsePutCommand() Node {
 		return nil
 	}
 
-	cmd.Table = args[0].String()
+	cmd.Table = NormalizeTableKey(args[0].String())
 	cmd.Key = args[1].String()
 	cmd.Value = args[2].String()
 
@@ -294,7 +298,7 @@ func (p *Parser) parseDelCommand() Node {
 		return nil
 	}
 
-	cmd.Table = args[0].String()
+	cmd.Table = NormalizeTableKey(args[0].String())
 	cmd.Key = args[1].String()
 
 	return cmd
@@ -327,4 +331,14 @@ func (p *Parser) parseDelParameters() []*Identifier {
 	}
 
 	return identifiers
+}
+
+// -------Helpers---------------------------------------------------------------
+
+// NormalizeTableKey ensures the table has no suffix.
+func NormalizeTableKey(name string) string {
+	if strings.HasSuffix(name, globals.TBL_SUFFIX) {
+		return strings.TrimSuffix(name, globals.TBL_SUFFIX)
+	}
+	return name
 }

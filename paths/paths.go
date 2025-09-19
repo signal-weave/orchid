@@ -65,6 +65,24 @@ func GetTableWAL(tbl string) (string, bool) {
 	return "", false
 }
 
+// Returns a list of absolute paths to the table .db files.
+func GetTablePaths() []string {
+	items, err := GetDirContents(DatabasePath)
+	if err != nil {
+		return nil
+	}
+
+	tables := []string{}
+
+	for _, item := range items {
+		if strings.HasSuffix(item, globals.TBL_SUFFIX) {
+			tables = append(tables, item)
+		}
+	}
+
+	return tables
+}
+
 // -------Generic Utils---------------------------------------------------------
 
 // GetDirContents returns all items in path or encountered error.

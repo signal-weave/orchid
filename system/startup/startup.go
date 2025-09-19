@@ -2,12 +2,11 @@ package startup
 
 import (
 	"fmt"
+	"os"
+
 	"orchiddb/execution"
-	"orchiddb/globals"
 	"orchiddb/paths"
 	"orchiddb/storage"
-	"os"
-	"strings"
 )
 
 func Startup(argv []string) {
@@ -24,41 +23,20 @@ func parseCLI(argv []string) {
 	}
 }
 
+// Starts a worker for each table in the database path.
 func loadWorkers() {
-	tablePaths := getTablePaths()
-	if tablePaths == nil {
+	tablePaths := paths.GetTablePaths()
+	if len(tablePaths) == 0 {
 		return
 	}
 
 	for _, p := range tablePaths {
-		_, err := os.Stat(p)
-		if err != nil {
-			continue // Does not exist
-		}
-
 		tbl, err := storage.GetTable(p)
 		if err != nil {
 			continue
 		}
 
-		execution.NewWorker(tbl) // Adds self to map
+		w := execution.NewWorker(tbl) // Adds self to active table map
+		w.Start()
 	}
-}
-
-// Returns a list of absolute paths to the table .db files.
-func getTablePaths() []string {
-	items, err := paths.GetDirContents(paths.DatabasePath)
-	if err != nil {
-		return nil
-	}
-
-	tables := []string{}
-
-	for _, item := range items {
-		if strings.HasSuffix(item, globals.TBL_SUFFIX) {
-			tables = append(tables, item)
-		}
-	}
-
-	return tables
 }
