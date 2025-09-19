@@ -2,18 +2,23 @@ package main
 
 import (
 	"fmt"
+	"os"
+
 	"orchiddb/globals"
 	"orchiddb/parser"
 	"orchiddb/storage"
 	"orchiddb/system"
+	"orchiddb/system/startup"
 )
 
 var majorVersion int = 0 // Proud version
-var minorVersion int = 1 // Real version
+var minorVersion int = 2 // Real  version
 var patchVersion int = 0 // Sucky verison
 
 func main() {
 	system.PrintStartupText(majorVersion, minorVersion, patchVersion)
+
+	startup.Startup(os.Args[1:])
 
 	test()
 	test2()
@@ -42,6 +47,7 @@ func test() {
 	for k, v := range entries {
 		db.Put([]byte(k), []byte(v))
 	}
+	db.Commit()
 
 	for _, v := range []string{"Key1", "Key2", "Key3", "Key4", "Key5", "Key6"} {
 		item, _ := db.Get([]byte(v))
@@ -49,9 +55,10 @@ func test() {
 	}
 
 	_ = db.Del([]byte("Key1"))
+	db.WriteFreelist()
+	db.Commit()
 	item, _ := db.Get([]byte("Key1"))
 
-	db.WriteFreelist()
 	fmt.Printf("item is: %+v\n", item)
 	_ = db.Close()
 }

@@ -14,6 +14,8 @@ type Options struct {
 	MaxThreshold   float32 // Bytes to be filled before node split.
 }
 
+// NewOptions builds a table options struct from the global values assembled by
+// CLI args or defaults.
 func NewOptions() *Options {
 	o := &Options{
 		PageSize: globals.PageSize,

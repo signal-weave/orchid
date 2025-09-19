@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MetaPageNum     pageNum = 0 // The meta page's page number in each db file
+	MetaPageNum     pageNum = 0
 	FreelistPageNum pageNum = 1
 	RootNodePageNum pageNum = 2
 )
@@ -17,39 +17,44 @@ const (
 // freelist and root node pages.
 // Should always default to page 0 in a new db file.
 type meta struct {
-	FreelistPage pageNum
-	RootPage     pageNum
+	FreelistPageNum pageNum
+	RootPageNum     pageNum
 }
 
 func newMeta() *meta {
 	return &meta{
-		FreelistPage: FreelistPageNum,
-		RootPage:     RootNodePageNum,
+		FreelistPageNum: FreelistPageNum,
+		RootPageNum:     RootNodePageNum,
 	}
 }
 
 // serializeToPage writes the meta's contents into page p.
-func (m *meta) serializeToPage(p *page) {
-	buf := p.contents
-
+func (m *meta) serializeToPage() *page {
+	p := NewEmptyPage(MetaPageNum)
 	pos := 0
 
-	binary.LittleEndian.PutUint64(buf[pos:], uint64(m.FreelistPage))
+	insertPageMarker(p.contents)
+	pos += globals.PageMarkerSize
+
+	binary.LittleEndian.PutUint64(p.contents[pos:], uint64(m.FreelistPageNum))
 	pos += globals.PageNumSize
 
-	binary.LittleEndian.PutUint64(buf[pos:], uint64(m.RootPage))
+	binary.LittleEndian.PutUint64(p.contents[pos:], uint64(m.RootPageNum))
 	pos += globals.PageNumSize
+
+	return p
 }
 
 // deserializeFromPage constructs a new meta from the contents of page p.
 func (m *meta) deserializeFromPage(p *page) {
-	buf := p.contents
-
 	pos := 0
 
-	m.FreelistPage = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
+	verifyPageMarker(p.contents)
+	pos += globals.PageMarkerSize
+
+	m.FreelistPageNum = pageNum(binary.LittleEndian.Uint64(p.contents[pos:]))
 	pos += globals.PageNumSize
 
-	m.RootPage = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
+	m.RootPageNum = pageNum(binary.LittleEndian.Uint64(p.contents[pos:]))
 	pos += globals.PageNumSize
 }

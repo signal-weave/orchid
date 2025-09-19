@@ -1,6 +1,10 @@
 package storage
 
-import "orchiddb/globals"
+import (
+	"bytes"
+	"errors"
+	"orchiddb/globals"
+)
 
 type pageNum uint64
 
@@ -11,15 +15,34 @@ type pageNum uint64
 // contain a bespoke layout for specific tracking or metadata within the opened
 // table file.
 type page struct {
-	pageNum  pageNum
-	contents []byte
+	magicMarker []byte
+	pageNum     pageNum
+	contents    []byte
 }
 
 func NewEmptyPage(pagenum pageNum) *page {
 	contents := make([]byte, globals.PageSize)
 
 	return &page{
-		pageNum:  pageNum(pagenum),
-		contents: contents,
+		magicMarker: globals.PageMarker,
+		pageNum:     pageNum(pagenum),
+		contents:    contents,
 	}
+}
+
+// Verifies that the page has the magic marker at the beginning.
+//
+// If the marker is not found, either a non-orchid page is being read or the
+// pages have been offset or drifted, resulting in database corruption.
+func verifyPageMarker(buf []byte) {
+	marker := []byte{buf[0], buf[1], buf[2], buf[3]}
+	if !bytes.Equal(marker, globals.PageMarker) {
+		err := errors.New("Page marker not found, table pages are offset!")
+		panic(err)
+	}
+}
+
+// insertPageMarker appends globals.PageMarker to the beginning of a page.
+func insertPageMarker(buf []byte) {
+	copy(buf[0:4], globals.PageMarker[:])
 }

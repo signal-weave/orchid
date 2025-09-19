@@ -15,6 +15,7 @@ const metaPage = 0
 // using the space of a freed page or allocating a new one.
 type freelist struct {
 	// Holds the maximum page allocated. maxpage*pageSize = filesize
+	// (excluding the freelist page and meta page).
 	MaxPage pageNum
 
 	// Pages that were previously allocated but are now free
@@ -53,40 +54,49 @@ func (fr *freelist) ReleasePage(page pageNum) {
 // -------Serialization---------------------------------------------------------
 
 // serializeToPage writes the freelist's contents into page p.
-func (fr *freelist) serializeToPage(p *page) []byte {
-	buf := p.contents
+func (fr *freelist) serializeToPage() *page {
+	p := NewEmptyPage(FreelistPageNum)
 	pos := 0
 
+	// Page marker
+	insertPageMarker(p.contents)
+	pos += globals.PageMarkerSize
+
 	// MaxPage count
-	binary.LittleEndian.PutUint64(buf[pos:], uint64(fr.MaxPage))
+	binary.LittleEndian.PutUint64(p.contents[pos:], uint64(fr.MaxPage))
 	pos += 8
 
 	// released pages count
-	binary.LittleEndian.PutUint16(buf[pos:], uint16(len(fr.ReleasedPages)))
+	binary.LittleEndian.PutUint16(p.contents[pos:], uint16(len(fr.ReleasedPages)))
 	pos += 2
 
 	for _, page := range fr.ReleasedPages {
-		binary.LittleEndian.PutUint64(buf[pos:], uint64(page))
+		binary.LittleEndian.PutUint64(p.contents[pos:], uint64(page))
 		pos += globals.PageNumSize
 	}
 
-	return buf
+	return p
 }
 
 // deserializeFromPage constructs a new freelist from the contents of page p.
 func (fr *freelist) deserializeFromPage(p *page) {
-	buf := p.contents
 	pos := 0
 	fr.ReleasedPages = fr.ReleasedPages[:0] // reset
 
-	fr.MaxPage = pageNum(binary.LittleEndian.Uint64(buf[pos:]))
+	// Page marker
+	verifyPageMarker(p.contents)
+	pos += globals.PageMarkerSize
+
+	// Max page count
+	fr.MaxPage = pageNum(binary.LittleEndian.Uint64(p.contents[pos:]))
 	pos += 8
 
-	releasedPagesCount := int(binary.LittleEndian.Uint16(buf[pos:]))
+	// Release page count
+	releasedPagesCount := int(binary.LittleEndian.Uint16(p.contents[pos:]))
 	pos += 2
 
 	for range releasedPagesCount {
-		page := pageNum(binary.LittleEndian.Uint64(buf[pos:]))
+		page := pageNum(binary.LittleEndian.Uint64(p.contents[pos:]))
 		pos += globals.PageNumSize
 		fr.ReleasedPages = append(fr.ReleasedPages, page)
 	}
