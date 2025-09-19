@@ -140,8 +140,7 @@ func (p *Parser) parseMakeCommand() Node {
 
 	p.nextToken() // Move passed LPAREN to TABLE
 
-	table := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	cmd.Table = table
+	cmd.Table = p.curToken.Literal
 
 	if !p.expectPeek(RPAREN) {
 		return nil
@@ -164,8 +163,7 @@ func (p *Parser) parseDropCommand() Node {
 
 	p.nextToken() // Move passed LPAREN to TABLE
 
-	table := &Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	cmd.Table = table
+	cmd.Table = p.curToken.Literal
 
 	if !p.expectPeek(RPAREN) {
 		return nil
@@ -188,8 +186,8 @@ func (p *Parser) parseGetCommand() Node {
 		return nil
 	}
 
-	cmd.Table = args[0]
-	cmd.Key = args[1]
+	cmd.Table = args[0].String()
+	cmd.Key = args[1].String()
 
 	return cmd
 }
@@ -237,9 +235,9 @@ func (p *Parser) parsePutCommand() Node {
 		return nil
 	}
 
-	cmd.Table = args[0]
-	cmd.Key = args[1]
-	cmd.Value = args[2]
+	cmd.Table = args[0].String()
+	cmd.Key = args[1].String()
+	cmd.Value = args[2].String()
 
 	return cmd
 }
@@ -296,8 +294,8 @@ func (p *Parser) parseDelCommand() Node {
 		return nil
 	}
 
-	cmd.Table = args[0]
-	cmd.Key = args[1]
+	cmd.Table = args[0].String()
+	cmd.Key = args[1].String()
 
 	return cmd
 }

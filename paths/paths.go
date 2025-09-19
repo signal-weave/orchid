@@ -2,6 +2,7 @@ package paths
 
 import (
 	"fmt"
+	"orchiddb/globals"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,7 +57,7 @@ func GetTableWAL(tbl string) (string, bool) {
 	}
 
 	for _, f := range files {
-		if strings.Contains(f, tbl) && strings.HasSuffix(f, ".log") {
+		if strings.Contains(f, tbl) && strings.HasSuffix(f, globals.WAL_SUFFIX) {
 			return f, true
 		}
 	}

@@ -27,9 +27,8 @@ func main() {
 func test() {
 	globals.MinFillPercent = 0.0125
 	globals.MaxFillPercent = 0.025
-	options := storage.NewOptions()
 
-	db, err := storage.GetTable("db.db", options)
+	db, err := storage.GetTable("db.db")
 	if err != nil {
 		panic(err)
 	}

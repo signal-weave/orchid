@@ -3,15 +3,19 @@ package storage
 import (
 	"bytes"
 	"fmt"
-	"orchiddb/globals"
 	"os"
 	"sync"
+
+	"orchiddb/globals"
+	"orchiddb/paths"
 )
 
 // Table is the databse struct that uses a pager to read/write/create pages and
 // orchestrates meta, freelist, and node page tyeps.
 // Creating and closing a table opens and closes a stream to the table file.
 type Table struct {
+	Name string
+
 	rwMutex sync.RWMutex
 	options Options
 
@@ -26,7 +30,9 @@ type Table struct {
 // Gets the table file from path.
 // If it does not exist, a new one is created.
 // Returns error, if any.
-func GetTable(path string, options *Options) (*Table, error) {
+func GetTable(path string) (*Table, error) {
+	options := NewOptions()
+
 	_, err := os.Stat(path)
 	if err == nil {
 		return openTable(path, options)
@@ -67,7 +73,13 @@ func createTable(path string, options *Options) (*Table, error) {
 		return nil, err
 	}
 
+	tableName, err := paths.GetStem(path)
+	if err != nil {
+		return nil, err
+	}
+
 	tbl := Table{
+		Name:     tableName,
 		rwMutex:  sync.RWMutex{},
 		options:  *options,
 		meta:     m,
@@ -94,6 +106,10 @@ func openTable(path string, options *Options) (*Table, error) {
 	if err != nil {
 		return nil, err
 	}
+	tableName, err := paths.GetStem(path)
+	if err != nil {
+		return nil, err
+	}
 
 	// ---- read meta (page 0)
 	metaPg, err := pager.ReadPage(MetaPageNum)
@@ -115,6 +131,7 @@ func openTable(path string, options *Options) (*Table, error) {
 	fr.deserializeFromPage(flPg)
 
 	return &Table{
+		Name:     tableName,
 		rwMutex:  sync.RWMutex{},
 		options:  *options,
 		meta:     m,
