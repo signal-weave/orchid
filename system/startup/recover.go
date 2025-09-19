@@ -3,7 +3,6 @@ package startup
 import (
 	"fmt"
 	"os"
-	"strings"
 
 	"orchiddb/paths"
 	"orchiddb/storage"
@@ -12,7 +11,7 @@ import (
 // performRecoveryCheck checks for any table WAL files and runs a recovery
 // attempt from them.
 func performRecoveryCheck() {
-	tableFiles := getTablePaths()
+	tableFiles := paths.GetTablePaths()
 	if tableFiles == nil {
 		return
 	}
@@ -27,7 +26,7 @@ func performRecoveryCheck() {
 			continue
 		}
 
-		db, err := storage.GetTable(t, storage.NewOptions())
+		db, err := storage.GetTable(t)
 		if err != nil {
 			os.Remove(t)
 			continue
@@ -44,21 +43,4 @@ func performRecoveryCheck() {
 
 		db.Close()
 	}
-}
-
-func getTablePaths() []string {
-	items, err := paths.GetDirContents(paths.DatabasePath)
-	if err != nil {
-		return nil
-	}
-
-	tables := []string{}
-
-	for _, item := range items {
-		if strings.HasSuffix(item, ".db") {
-			tables = append(tables, item)
-		}
-	}
-
-	return tables
 }

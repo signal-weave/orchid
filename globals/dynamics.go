@@ -9,6 +9,15 @@ import (
 // This is not meant to contain constant values.
 // -----------------------------------------------------------------------------
 
+// If the server should begin the shutdown process.
+var PerformShutdown bool = false
+
+// Which address the server uses when listening.
+var Address string = "127.0.0.1"
+
+// Which port the server uses when listening.
+var Port int = 6000
+
 // The number of writes that must occur between table flushes.
 var FlushThreshold int = 10
 

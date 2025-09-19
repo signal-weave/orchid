@@ -2,6 +2,7 @@ package paths
 
 import (
 	"fmt"
+	"orchiddb/globals"
 	"os"
 	"path/filepath"
 	"strings"
@@ -56,12 +57,30 @@ func GetTableWAL(tbl string) (string, bool) {
 	}
 
 	for _, f := range files {
-		if strings.Contains(f, tbl) && strings.HasSuffix(f, ".log") {
+		if strings.Contains(f, tbl) && strings.HasSuffix(f, globals.WAL_SUFFIX) {
 			return f, true
 		}
 	}
 
 	return "", false
+}
+
+// Returns a list of absolute paths to the table .db files.
+func GetTablePaths() []string {
+	items, err := GetDirContents(DatabasePath)
+	if err != nil {
+		return nil
+	}
+
+	tables := []string{}
+
+	for _, item := range items {
+		if strings.HasSuffix(item, globals.TBL_SUFFIX) {
+			tables = append(tables, item)
+		}
+	}
+
+	return tables
 }
 
 // -------Generic Utils---------------------------------------------------------
