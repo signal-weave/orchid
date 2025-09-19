@@ -2,13 +2,16 @@ package storage
 
 import (
 	"fmt"
-	"orchiddb/filestamp"
 	"os"
+
+	"orchiddb/filestamp"
+	"orchiddb/globals"
+	"orchiddb/paths"
 )
 
 // A Transaction is the sum of all pages to update from a user action.
 type Transaction struct {
-	pager *Pager
+	Pager *Pager
 	wal   *WAL
 
 	meta       *meta
@@ -18,7 +21,7 @@ type Transaction struct {
 
 func NewTransaction(pgr *Pager) *Transaction {
 	return &Transaction{
-		pager:      pgr,
+		Pager:      pgr,
 		wal:        NewWal(),
 		dirtyPages: map[pageNum]*Node{},
 	}
@@ -36,7 +39,12 @@ func (t *Transaction) appendPage(n *Node) {
 // Finally WAL file is deleted as to not confuse system on reboot an dconserve
 // disk space.
 func (t *Transaction) Commit() error {
-	logFile := filestamp.FileNameMonotonic("db", ".log")
+	tableName, err := paths.GetStem(t.Pager.f)
+	if err != nil || tableName == "" {
+		return fmt.Errorf("could not get table name from %s", t.Pager.f.Name())
+	}
+	logFile := filestamp.FileNameMonotonic(tableName, globals.WAL_SUFFIX)
+
 	if err := t.writeLog(logFile); err != nil {
 		return err
 	}
@@ -77,7 +85,7 @@ func (t *Transaction) writeLog(path string) error {
 // writeToTable commits the atual updated pages to the .db file.
 func (t *Transaction) writeToTable() error {
 	for _, p := range t.wal.pages {
-		err := t.pager.WritePage(p)
+		err := t.Pager.WritePage(p)
 		if err != nil {
 			return err
 		}

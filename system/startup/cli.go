@@ -3,8 +3,10 @@ package startup
 import (
 	"flag"
 	"fmt"
-	"orchiddb/globals"
 	"os"
+
+	"orchiddb/globals"
+	"orchiddb/paths"
 )
 
 func parseCLIArgs(argv []string) error {
@@ -14,7 +16,7 @@ func parseCLIArgs(argv []string) error {
 	fs.SetOutput(os.Stdout)
 
 	dbPathHelp := "Path to place database files. Ideally is empty directory."
-	fs.StringVar(&globals.DatabasePath, "path", globals.DatabasePath, dbPathHelp)
+	fs.StringVar(&paths.DatabasePath, "path", paths.DatabasePath, dbPathHelp)
 
 	pageHelp := "Size in bytes for a single database page. Defaults to OS page size."
 	fs.IntVar(&globals.PageSize, "page-size", globals.PageSize, pageHelp)

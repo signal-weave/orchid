@@ -18,7 +18,7 @@ type Table struct {
 	meta     *meta
 	freelist *freelist
 
-	txn *Transaction
+	Txn *Transaction
 }
 
 // -------Table File Management-------------------------------------------------
@@ -72,7 +72,7 @@ func createTable(path string, options *Options) (*Table, error) {
 		options:  *options,
 		meta:     m,
 		freelist: fr,
-		txn:      NewTransaction(pager),
+		Txn:      NewTransaction(pager),
 	}
 
 	root := NewEmptyNode()
@@ -80,9 +80,9 @@ func createTable(path string, options *Options) (*Table, error) {
 	fr.MaxPage = m.RootPageNum
 
 	tbl.WriteNode(root)
-	tbl.txn.meta = m
-	tbl.txn.freelist = fr
-	tbl.txn.Commit()
+	tbl.Txn.meta = m
+	tbl.Txn.freelist = fr
+	tbl.Txn.Commit()
 
 	return &tbl, nil
 }
@@ -119,16 +119,16 @@ func openTable(path string, options *Options) (*Table, error) {
 		options:  *options,
 		meta:     m,
 		freelist: fr,
-		txn:      NewTransaction(pager),
+		Txn:      NewTransaction(pager),
 	}, nil
 }
 
 func (tbl *Table) Commit() error {
-	return tbl.txn.Commit()
+	return tbl.Txn.Commit()
 }
 
 func (tbl *Table) Close() error {
-	return tbl.txn.pager.Close()
+	return tbl.Txn.Pager.Close()
 }
 
 // -------Page Management-------------------------------------------------------
@@ -138,7 +138,7 @@ func (tbl *Table) AllocatePage() *page {
 	pn := tbl.freelist.GetNextPage()
 
 	// Persist freelist after allocation
-	tbl.txn.freelist = tbl.freelist
+	tbl.Txn.freelist = tbl.freelist
 
 	newPage := NewEmptyPage(pn)
 	return newPage
@@ -151,11 +151,11 @@ func (tbl *Table) ReleasePage(pn pageNum) {
 }
 
 func (tbl *Table) WriteFreelist() {
-	tbl.txn.freelist = tbl.freelist
+	tbl.Txn.freelist = tbl.freelist
 }
 
 func (tbl *Table) WriteMeta() {
-	tbl.txn.meta = tbl.meta
+	tbl.Txn.meta = tbl.meta
 }
 
 // -------Node IO---------------------------------------------------------------
@@ -165,20 +165,20 @@ func (tbl *Table) NewNode(items []*Item, childNodes []pageNum) *Node {
 	node.items = items
 	node.childNodes = childNodes
 	node.pageNum = tbl.freelist.GetNextPage()
-	tbl.txn.freelist = tbl.freelist // be sure to stage FL after updating
+	tbl.Txn.freelist = tbl.freelist // be sure to stage FL after updating
 	node.tbl = tbl
 
 	return node
 }
 
 func (tbl *Table) GetNode(pageNum pageNum) (*Node, error) {
-	n, exists := tbl.txn.dirtyPages[pageNum]
+	n, exists := tbl.Txn.dirtyPages[pageNum]
 	if exists {
 		// No point reading if node has been updated but yet to be written.
 		return n, nil
 	}
 
-	pg, err := tbl.txn.pager.ReadPage(pageNum)
+	pg, err := tbl.Txn.Pager.ReadPage(pageNum)
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +231,7 @@ func (tbl *Table) WriteNode(n *Node) {
 		pg = NewEmptyPage(n.pageNum)
 	}
 
-	tbl.txn.appendPage(n)
+	tbl.Txn.appendPage(n)
 }
 
 // Serializes the given nodes into pages and adds them to current transaction.
