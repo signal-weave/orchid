@@ -21,7 +21,7 @@ var line7 string = " `Y8bood8P'  d888b    `Y8bod8P' o888o o888o o888o `Y8bod88P'
 var lines []string = []string{line1, line2, line3, line4, line5, line6, line7}
 
 var producedBy string = fmt.Sprintf("A %s product.", globals.Developer)
-var disclaimer string = "Orchid is a work in progress in-memory KV database."
+var disclaimer string = "Orchid is a work in progress KV database."
 
 func printHeader() {
 	width := getOutputWidth()
