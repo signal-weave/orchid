@@ -3,12 +3,12 @@ Orchid is a simple Key Value database written in Go.
 
 ```
       .oooooo.                      oooo         o8o        .o8     oooooooooo.   oooooooooo.
-     d8P'  `Y8b                     `888         `''       '888     `888'   `Y8b  `888'   `Y8b    _ (`-`) _
-    888      888 oooo d8b  .ooooo.   888 .oo.   oooo   .oooo888      888      888  888     888  /` '.\\ /.' `\\
-    888      888 `888''8P d88' `'Y8  888P'Y88b  `888  d88' `888      888      888  888oooo888'  ``'-.,=,.-'``
-    888      888  888     888        888   888   888  888   888      888      888  888    `88b    .'//v\\\\'.
-    `88b    d88'  888     888   .o8  888   888   888  888   888      888     d88'  888    .88P   (_/\\ \" /\\_)
-     `Y8bood8P'  d888b    `Y8bod8P' o888o o888o o888o `Y8bod88P'    o888bood8P'   o888bood8P'        '-'
+     d8P'  `Y8b                     `888         `''       '888     `888'   `Y8b  `888'   `Y8b
+    888      888 oooo d8b  .ooooo.   888 .oo.   oooo   .oooo888      888      888  888     888
+    888      888 `888''8P d88' `'Y8  888P'Y88b  `888  d88' `888      888      888  888oooo888'
+    888      888  888     888        888   888   888  888   888      888      888  888    `88b
+    `88b    d88'  888     888   .o8  888   888   888  888   888      888     d88'  888    .88P
+     `Y8bood8P'  d888b    `Y8bod8P' o888o o888o o888o `Y8bod88P'    o888bood8P'   o888bood8P'
 ```
 
 Orchid is a work in progress KV database.
