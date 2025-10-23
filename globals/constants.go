@@ -75,6 +75,6 @@ const (
 // -------Terminal--------------------------------------------------------------
 
 const (
-	DEFAULT_TERMINAL_W = 80
+	DEFAULT_TERMINAL_W = 120
 	DEFAULT_TERMINAL_H = 25
 )

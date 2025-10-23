@@ -8,14 +8,12 @@ import (
 	"orchiddb/globals"
 )
 
-
-
-var line1 string = "  .oooooo.                      oooo         o8o        .o8     oooooooooo.   oooooooooo.         _    "
-var line2 string = " d8P'  `Y8b                     `888         `''       '888     `888'   `Y8b  `888'   `Y8b    _ (`-`) _    "
-var line3 string = "888      888 oooo d8b  .ooooo.   888 .oo.   oooo   .oooo888      888      888  888     888  /` '.\\ /.' `\\    "
-var line4 string = "888      888 `888''8P d88' `'Y8  888P'Y88b  `888  d88' `888      888      888  888oooo888'  ``'-.,=,.-'``    "
-var line5 string = "888      888  888     888        888   888   888  888   888      888      888  888    `88b    .'//v\\\\'.    "
-var line6 string = "`88b    d88'  888     888   .o8  888   888   888  888   888      888     d88'  888    .88P   (_/\\ \" /\\_)    "
+var line1 string = "  .oooooo.                      oooo         o8o        .o8     oooooooooo.   oooooooooo.         _"
+var line2 string = " d8P'  `Y8b                     `888         `''       '888     `888'   `Y8b  `888'   `Y8b    _ (`-`) _"
+var line3 string = "888      888 oooo d8b  .ooooo.   888 .oo.   oooo   .oooo888      888      888  888     888  /` '.\\ /.' `\\"
+var line4 string = "888      888 `888''8P d88' `'Y8  888P'Y88b  `888  d88' `888      888      888  888oooo888'  ``'-.,=,.-'``"
+var line5 string = "888      888  888     888        888   888   888  888   888      888      888  888    `88b    .'//v\\\\'."
+var line6 string = "`88b    d88'  888     888   .o8  888   888   888  888   888      888     d88'  888    .88P   (_/\\ \" /\\_)"
 var line7 string = " `Y8bood8P'  d888b    `Y8bod8P' o888o o888o o888o `Y8bod88P'    o888bood8P'   o888bood8P'        '-'    "
 
 var lines []string = []string{line1, line2, line3, line4, line5, line6, line7}

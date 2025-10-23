@@ -2,13 +2,12 @@ package system
 
 import (
 	"fmt"
+	"orchiddb/globals"
 	"os"
 	"strings"
 	"unicode/utf8"
 
 	"golang.org/x/term"
-
-	"orchiddb/globals"
 )
 
 func SprintfLn(formatStr string, args ...string) {
@@ -25,6 +24,9 @@ func getOutputWidth() int {
 	if term.IsTerminal(int(os.Stdout.Fd())) {
 		width, _, err := term.GetSize(int(os.Stdout.Fd()))
 		if err == nil {
+			if width <= 0 {
+				return globals.DEFAULT_TERMINAL_W
+			}
 			return width
 		}
 	}
