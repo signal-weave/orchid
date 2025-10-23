@@ -26,13 +26,12 @@ func main() {
 }
 
 func startServer() {
-	server, err := server.NewServer()
+	s, err := server.NewServer()
 	if err != nil {
 		fmt.Println("server start error:", err)
 		os.Exit(2)
-		select {}
 	}
-	if err := server.Run(); err != nil {
+	if err := s.Run(); err != nil {
 		fmt.Println("server runtime error:", err)
 	}
 }
