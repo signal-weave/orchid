@@ -1,6 +1,6 @@
 package parser
 
-// The object responsible for reading through the characters of a command
+// Lexer is responsible for reading through the characters of a command.
 type Lexer struct {
 	input        string
 	position     int  // current position in input (points to current char)
@@ -25,7 +25,7 @@ func (l *Lexer) readChar() {
 	l.readPosition += 1
 }
 
-// Checks the current byte to match against a pre-defined token.
+// NextToken checks the current byte to match against a pre-defined token.
 // If one is found, a new token of a premade type is returned at the current
 // char position, otherwise, a new token of user inputs is created and returned.
 func (l *Lexer) NextToken() Token {

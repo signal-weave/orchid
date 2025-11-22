@@ -2,15 +2,16 @@ package parser
 
 import (
 	"fmt"
-	"orchiddb/globals"
 	"strings"
+
+	"orchiddb/globals"
 )
 
 type (
 	parseCmdFn func() Node
 )
 
-// The primary token parsing engine.
+// Parser is the primary token parsing engine.
 // Contains a lexer that will lex a byte stream, creating an array of tokens.
 // These tokens will then be parsed into command nodes and finally packed into a
 // command struct containing the command.
@@ -48,8 +49,8 @@ func (p *Parser) registerParseFn(tokenType TokenType, fn parseCmdFn) {
 	p.parseFunctions[tokenType] = fn
 }
 
-// Instructs the Lexer to parse out the next token and then decides which parse
-// function to invoke based on lexed token type.
+// ParseCommand instructs the Lexer to parse out the next token and then decides
+// which parse function to invoke based on lexed token type.
 // Currently only supports queries of a single command.
 func (p *Parser) ParseCommand() *Command {
 	cmd := &Command{}
@@ -113,7 +114,7 @@ func (p *Parser) missingArgumentError(arg, cmd string) {
 	p.errors = append(p.errors, msg)
 }
 
-// For debugging purposes.
+// PrintCurTokenData is for debugging purposes.
 func (p *Parser) PrintCurTokenData() {
 	fmt.Println("cur type", p.curToken.Type)
 	fmt.Println("cur literal", p.curToken.Literal)
@@ -197,7 +198,7 @@ func (p *Parser) parseGetCommand() Node {
 }
 
 func (p *Parser) parseGetParameters() []*Identifier {
-	identifiers := []*Identifier{}
+	var identifiers []*Identifier
 
 	if p.missingNextArg("Table", GET) {
 		// move passed RPAREN
@@ -247,7 +248,7 @@ func (p *Parser) parsePutCommand() Node {
 }
 
 func (p *Parser) parsePutParameters() []*Identifier {
-	identifiers := []*Identifier{}
+	var identifiers []*Identifier
 
 	if p.missingNextArg("Table", PUT) {
 		// move passed RPAREN
@@ -305,7 +306,7 @@ func (p *Parser) parseDelCommand() Node {
 }
 
 func (p *Parser) parseDelParameters() []*Identifier {
-	identifiers := []*Identifier{}
+	var identifiers []*Identifier
 
 	if p.missingNextArg("Table", GET) {
 		// move passed RPAREN
