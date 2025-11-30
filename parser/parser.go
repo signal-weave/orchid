@@ -50,7 +50,7 @@ func (p *Parser) registerParseFn(tokenType TokenType, fn parseCmdFn) {
 }
 
 // ParseCommand instructs the Lexer to parse out the next token and then decides
-// which parse function to invoke based on lexed token type.
+// which parse function to invoke based on the lexed token type.
 // Currently only supports queries of a single command.
 func (p *Parser) ParseCommand() *Command {
 	cmd := &Command{}

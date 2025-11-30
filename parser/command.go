@@ -5,8 +5,8 @@ import (
 	"net"
 )
 
-// A node is a struct that contains the fields of a command.
-// E.g. a GetCommand contains the GET token, a table identifier, and a key
+// Node is a struct that contains the fields of a command.
+// E.g., a GetCommand contains the GET token, a table identifier, and a key
 // identifier.
 type Node interface {
 	TokenLiteral() string
@@ -15,9 +15,9 @@ type Node interface {
 }
 
 // A Command is a struct with a valid command node.
-// These are created by the parser.
+// The parser creates these.
 type Command struct {
-	// Its very possible the parser parses an array of command nodes in the
+	// It's very possible the parser will parse an array of command nodes in the
 	// future, which is why this wrapper exists.
 	Command Node
 }
@@ -39,16 +39,11 @@ type MakeCommand struct {
 	Table string
 }
 
-func (mc *MakeCommand) TokenLiteral() string {
-	return mc.Token.Literal
-}
+func (mc *MakeCommand) TokenLiteral() string { return mc.Token.Literal }
+func (mc *MakeCommand) GetTable() string     { return mc.Table }
 
 func (mc *MakeCommand) String() string {
 	return fmt.Sprintf("cmd: %s( table: %s )", mc.Token.Literal, mc.Table)
-}
-
-func (mc *MakeCommand) GetTable() string {
-	return mc.Table
 }
 
 // -------DROP Command----------------------------------------------------------
@@ -60,16 +55,11 @@ type DropCommand struct {
 	Table string // the first argument identifier
 }
 
-func (dc *DropCommand) TokenLiteral() string {
-	return dc.Token.Literal
-}
+func (dc *DropCommand) TokenLiteral() string { return dc.Token.Literal }
+func (dc *DropCommand) GetTable() string     { return dc.Table }
 
 func (dc *DropCommand) String() string {
 	return fmt.Sprintf("cmd: %s( table: %s )", dc.Token.Literal, dc.Table)
-}
-
-func (dc *DropCommand) GetTable() string {
-	return dc.Table
 }
 
 // -------GET Command-----------------------------------------------------------
@@ -84,18 +74,13 @@ type GetCommand struct {
 	Key   string // The second argument identifier
 }
 
-func (gc *GetCommand) TokenLiteral() string {
-	return gc.Token.Literal
-}
+func (gc *GetCommand) TokenLiteral() string { return gc.Token.Literal }
+func (gc *GetCommand) GetTable() string     { return gc.Table }
 
 func (gc *GetCommand) String() string {
 	return fmt.Sprintf(
 		"cmd: %s( table: %s, key: %s )", gc.Token.Literal, gc.Table, gc.Key,
 	)
-}
-
-func (gc *GetCommand) GetTable() string {
-	return gc.Table
 }
 
 // -------PUT Command-----------------------------------------------------------
@@ -110,19 +95,14 @@ type PutCommand struct {
 	Value string // The third argument identifier
 }
 
-func (dc *PutCommand) TokenLiteral() string {
-	return dc.Token.Literal
-}
+func (pc *PutCommand) TokenLiteral() string { return pc.Token.Literal }
+func (pc *PutCommand) GetTable() string     { return pc.Table }
 
-func (dc *PutCommand) String() string {
+func (pc *PutCommand) String() string {
 	return fmt.Sprintf(
 		"cmd: %s( table: %s, key: %s, value: %s )",
-		dc.Token.Literal, dc.Table, dc.Key, dc.Value,
+		pc.Token.Literal, pc.Table, pc.Key, pc.Value,
 	)
-}
-
-func (pc *PutCommand) GetTable() string {
-	return pc.Table
 }
 
 // -------DEL Command-----------------------------------------------------------
@@ -135,16 +115,11 @@ type DelCommand struct {
 	Key   string // The second argument identifier
 }
 
-func (dc *DelCommand) TokenLiteral() string {
-	return dc.Token.Literal
-}
+func (dc *DelCommand) TokenLiteral() string { return dc.Token.Literal }
+func (dc *DelCommand) GetTable() string     { return dc.Table }
 
 func (dc *DelCommand) String() string {
 	return fmt.Sprintf(
 		"cmd: %s( table: %s, key: %s )", dc.Token.Literal, dc.Table, dc.Key,
 	)
-}
-
-func (dc *DelCommand) GetTable() string {
-	return dc.Table
 }

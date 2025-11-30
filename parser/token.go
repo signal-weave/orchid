@@ -14,11 +14,13 @@ const (
 	IDENT = "IDENT"
 
 	// Delimiters
+
 	LPAREN = "("
 	RPAREN = ")"
 	COMMA  = ","
 
 	// Keywords
+
 	GET = "GET"
 	PUT = "PUT"
 	DEL = "DEL"
