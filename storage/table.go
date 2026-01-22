@@ -10,8 +10,8 @@ import (
 	"orchiddb/paths"
 )
 
-// Table is the databse struct that uses a pager to read/write/create pages and
-// orchestrates meta, freelist, and node page tyeps.
+// Table is the database struct that uses a pager to read/write/create pages and
+// orchestrates meta, freelist, and node page types.
 // Creating and closing a table opens and closes a stream to the table file.
 type Table struct {
 	Name string
@@ -27,7 +27,7 @@ type Table struct {
 
 // -------Table File Management-------------------------------------------------
 
-// Gets the table file from path.
+// GetTable gets the table file from the path.
 // If it does not exist, a new one is created.
 // Returns error, if any.
 func GetTable(path string) (*Table, error) {
@@ -43,33 +43,34 @@ func GetTable(path string) (*Table, error) {
 
 // createTable creates a new table file with: page 0 = meta; page 1 = freelist,
 // page 2 = initial root node.
-func createTable(path string, options *Options) (*Table, error) {
+func createTable(path string, options *Options) (tbl *Table, err error) {
 	pager, err := OpenPager(path)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if closeErr := pager.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
-	// ---- write meta page table of contents
+	// ---- write meta-page table of contents
 	m := newMeta()
 	fr := newFreelist()
 
 	// ---- write meta (page 0)
 	metaPg := m.serializeToPage()
 	if err := pager.WritePage(metaPg); err != nil {
-		_ = pager.Close()
 		return nil, fmt.Errorf("write meta: %w", err)
 	}
 
 	// ---- write freelist (page 1)
 	flPg := fr.serializeToPage()
-
 	if err := pager.WritePage(flPg); err != nil {
-		_ = pager.Close()
 		return nil, fmt.Errorf("write freelist: %w", err)
 	}
 
 	if err := pager.Sync(); err != nil {
-		_ = pager.Close()
 		return nil, err
 	}
 
@@ -78,7 +79,7 @@ func createTable(path string, options *Options) (*Table, error) {
 		return nil, err
 	}
 
-	tbl := Table{
+	tbl = &Table{
 		Name:     tableName,
 		rwMutex:  sync.RWMutex{},
 		options:  *options,
@@ -94,36 +95,43 @@ func createTable(path string, options *Options) (*Table, error) {
 	tbl.WriteNode(root)
 	tbl.Txn.meta = m
 	tbl.Txn.freelist = fr
-	tbl.Txn.Commit()
 
-	return &tbl, nil
+	if err := tbl.Txn.Commit(); err != nil {
+		return nil, err
+	}
+
+	return tbl, nil
 }
 
 // openTable opens an existing table file, reading page 0 (meta) then the
 // following infrastructure pages.
-func openTable(path string, options *Options) (*Table, error) {
+func openTable(path string, options *Options) (tbl *Table, err error) {
 	pager, err := OpenPager(path)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		if closeErr := pager.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
 	tableName, err := paths.GetStem(path)
 	if err != nil {
 		return nil, err
 	}
 
 	// ---- read meta (page 0)
-	metaPg, err := pager.ReadPage(MetaPageNum)
+	metaPg, err := pager.readPage(MetaPageNum)
 	if err != nil {
-		_ = pager.Close()
 		return nil, fmt.Errorf("read meta: %w", err)
 	}
 	m := newMeta()
 	m.deserializeFromPage(metaPg)
 
 	// ---- read freelist (meta.freelistPage)
-	flPg, err := pager.ReadPage(m.FreelistPageNum)
+	flPg, err := pager.readPage(m.FreelistPageNum)
 	if err != nil {
-		_ = pager.Close()
 		return nil, fmt.Errorf("read freelist: %w", err)
 	}
 	fl := newFreelist()
@@ -153,14 +161,14 @@ func (tbl *Table) Close() error {
 
 // -------Page Management-------------------------------------------------------
 
-// AllocatePage returns a fresh page number, writing back freelist state.
-func (tbl *Table) AllocatePage() *page {
+// allocatePage returns a fresh page number, writing back freelist state.
+func (tbl *Table) allocatePage() *page {
 	pn := tbl.freelist.GetNextPage()
 
 	// Persist freelist after allocation
 	tbl.Txn.freelist = tbl.freelist
 
-	newPage := NewEmptyPage(pn)
+	newPage := newEmptyPage(pn)
 	return newPage
 }
 
@@ -198,7 +206,7 @@ func (tbl *Table) GetNode(pageNum pageNum) (*Node, error) {
 		return n, nil
 	}
 
-	pg, err := tbl.Txn.Pager.ReadPage(pageNum)
+	pg, err := tbl.Txn.Pager.readPage(pageNum)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +218,7 @@ func (tbl *Table) GetNode(pageNum pageNum) (*Node, error) {
 	return node, nil
 }
 
-// getNodes returns a list of nodes based on their indexes (the breadcrumbs)
+// GetNodes returns a list of nodes based on their indexes (the breadcrumbs)
 // from the root.
 //
 //	         p
@@ -239,29 +247,31 @@ func (tbl *Table) GetNodes(indexes []int) ([]*Node, error) {
 	return nodes, nil
 }
 
-// Serializes the given node n into a page, then add to current transaction.
+// WriteNode serializes the given node n into a page, then adds to the current
+// transaction.
 func (tbl *Table) WriteNode(n *Node) {
 	var pg *page
 
 	if n.pageNum == 0 {
 		// Only allocate when the node doesn't already have an assigned page.
-		pg = tbl.AllocatePage()
+		pg = tbl.allocatePage()
 		n.pageNum = pg.pageNum
 	} else {
-		pg = NewEmptyPage(n.pageNum)
+		pg = newEmptyPage(n.pageNum)
 	}
 
 	tbl.Txn.appendPage(n)
 }
 
-// Serializes the given nodes into pages and adds them to current transaction.
+// WriteNodes serializes the given nodes into pages and adds them to the current
+// transaction.
 func (tbl *Table) WriteNodes(nodes ...*Node) {
 	for _, n := range nodes {
 		tbl.WriteNode(n)
 	}
 }
 
-// Mark the pageNum as freed, then persist the freelist page to disk.
+// DeleteNode marks the pageNum as freed, then persist the freelist page to disk.
 func (tbl *Table) DeleteNode(pageNum pageNum) {
 	tbl.freelist.ReleasePage(pageNum)
 	tbl.WriteFreelist()
@@ -270,7 +280,7 @@ func (tbl *Table) DeleteNode(pageNum pageNum) {
 // -------Node Tree Balancing---------------------------------------------------
 
 // getSplitIndex should be called when performing rebalance after an item is
-// removed. It checks if a node can spare an element, and if it does then it
+// removed. It checks if a node can spare an element, and if it does, then it
 // returns the index when there the split should happen.
 // Otherwise -1 is returned.
 func (tbl *Table) getSplitIndex(node *Node) int {
@@ -325,8 +335,11 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 
 	i := NewItem(key, value)
 
-	// Root node is created with database.
+	// The root node is created with a database.
 	root, err := tbl.GetNode(tbl.meta.RootPageNum)
+	if err != nil {
+		return err
+	}
 
 	// Find the path to the node where the insertion should happen
 	insertionIdx, nodeToInsertIn, ancestorIdxs, err := root.FindKey(i.Key, false)
@@ -334,7 +347,7 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 		return err
 	}
 
-	// If key already exists
+	// If the key already exists
 	exists := insertionIdx < len(nodeToInsertIn.items) &&
 		bytes.Equal(nodeToInsertIn.items[insertionIdx].Key, key)
 
@@ -353,7 +366,7 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 	}
 
 	// Rebalance the nodes all the way up. Start from on enode before the last
-	// and go all the way up, exlcluding root.
+	// and go all the way up, including root.
 	for i := len(ancestors) - 2; i >= 0; i-- {
 		pnode := ancestors[i]
 		node := ancestors[i+1]
@@ -369,7 +382,7 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 		newRoot := tbl.NewNode([]*Item{}, []pageNum{rootNode.pageNum})
 		newRoot.split(rootNode, 0)
 
-		// commit newly created root
+		// commit a newly created root
 		tbl.WriteNode(newRoot)
 
 		tbl.meta.RootPageNum = newRoot.pageNum
@@ -379,7 +392,7 @@ func (tbl *Table) Put(key []byte, value []byte) error {
 	return nil
 }
 
-// Remove removes a key from the tree.
+// Del removes a key from the tree.
 // It finds the correct node and the index to remove the item from and removes it.
 // When performing the search, the ancestors are returned as well.
 // This way we can iterate over them to check which nodes were modified and
@@ -421,8 +434,8 @@ func (tbl *Table) Del(key []byte) error {
 		return err
 	}
 
-	// Reblance the nodes all teh way up.
-	// Start from one node before the last and go all teh way up, excluding root.
+	// Rebalanced the nodes all the way up.
+	// Start from one node before the last and go all the way up, excluding root.
 	for i := len(ancestors) - 2; i >= 0; i-- {
 		pnode := ancestors[i]
 		node := ancestors[i+1]
@@ -438,7 +451,7 @@ func (tbl *Table) Del(key []byte) error {
 	// If the root node has no items after rebalancing, there's no need to save
 	// it because we ignore it.
 	if len(rootNode.items) == 0 && len(rootNode.childNodes) > 0 {
-		// Mark new root page in meta page and persist it to disk.
+		// Mark new root page in meta-page and persist it to disk.
 		tbl.meta.RootPageNum = ancestors[1].pageNum
 		tbl.WriteMeta()
 	}

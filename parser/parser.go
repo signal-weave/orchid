@@ -86,10 +86,10 @@ func (p *Parser) expectPeek(t TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
 		return true
-	} else {
-		p.peekError(t)
-		return false
 	}
+
+	p.peekError(t)
+	return false
 }
 
 // -------Error Handling--------------------------------------------------------

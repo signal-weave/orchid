@@ -32,12 +32,12 @@ func (t *Transaction) appendPage(n *Node) {
 }
 
 // Commit makes a WAL file before actually committing the changes to the DB.
-// If power loss happened mid WAL creation - transaction is discarded on
+// If power loss happened mid-WAL creation - transaction is discarded on
 // db reboot.
 // If power loss happened mid db commit - transaction is replayed via WAL file
 // on db reboot.
-// Finally WAL file is deleted as to not confuse system on reboot an dconserve
-// disk space.
+// Finally, the WAL file is deleted as to not confuse a system on reboot and
+// conserve disk space.
 func (t *Transaction) Commit() error {
 	tableName, err := paths.GetStem(t.Pager.f)
 	if err != nil || tableName == "" {
@@ -73,7 +73,7 @@ func (t *Transaction) writeLog(path string) error {
 	}
 	if len(t.dirtyPages) > 0 {
 		for _, n := range t.dirtyPages {
-			nPg := NewEmptyPage(n.pageNum)
+			nPg := newEmptyPage(n.pageNum)
 			n.serializeToPage(nPg)
 			t.wal.appendPage(nPg)
 		}
@@ -82,7 +82,7 @@ func (t *Transaction) writeLog(path string) error {
 	return t.wal.WriteLog(path)
 }
 
-// writeToTable commits the atual updated pages to the .db file.
+// writeToTable commits the actual updated pages to the .db file.
 func (t *Transaction) writeToTable() error {
 	for _, p := range t.wal.pages {
 		err := t.Pager.WritePage(p)

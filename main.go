@@ -12,9 +12,9 @@ import (
 	"orchiddb/system/startup"
 )
 
-var majorVersion int = 0 // Proud version
-var minorVersion int = 2 // Real  version
-var patchVersion int = 2 // Sucky version
+var majorVersion = 0 // Proud version
+var minorVersion = 2 // Real  version
+var patchVersion = 2 // Sucky version
 
 func main() {
 	system.PrintStartupText(majorVersion, minorVersion, patchVersion)

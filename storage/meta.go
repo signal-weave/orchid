@@ -13,7 +13,7 @@ const (
 )
 
 // The database file table of contents.
-// Contains page numbers for various non-user created pages, such as the
+// Contains page numbers for various non-user-created pages, such as the
 // freelist and root node pages.
 // Should always default to page 0 in a new db file.
 type meta struct {
@@ -30,7 +30,7 @@ func newMeta() *meta {
 
 // serializeToPage writes the meta's contents into page p.
 func (m *meta) serializeToPage() *page {
-	p := NewEmptyPage(MetaPageNum)
+	p := newEmptyPage(MetaPageNum)
 	pos := 0
 
 	insertPageMarker(p.contents)

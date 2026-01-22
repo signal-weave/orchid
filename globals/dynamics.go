@@ -9,25 +9,24 @@ import (
 // This is not meant to contain constant values.
 // -----------------------------------------------------------------------------
 
-// If the server should begin the shutdown process.
-var PerformShutdown bool = false
+// PerformShutdown denotes if the server should begin the shutdown process.
+var PerformShutdown = false
 
-// Which address the server uses when listening.
-var Address string = "127.0.0.1"
+// Address denotes which address the server uses when listening.
+var Address = "127.0.0.1"
 
-// Which port the server uses when listening.
-var Port int = 6000
-
-// The number of writes that must occur between table flushes.
-var FlushThreshold int = 10
+// Port denotes which port the server uses when listening.
+var Port = 6000
 
 // -------Database Page Options-------------------------------------------------
 
-// The size of a page in bytes.
+// PageSize denotes the size of a page in bytes.
 var PageSize = os.Getpagesize()
 
-// The minimum a page must be filled before it is consolidated.
+// MinFillPercent denotes the minimum percentage a page must be filled before it
+// is consolidated.
 var MinFillPercent float32 = 0.5
 
-// The maximum a page can be filled before it is split.
+// MaxFillPercent denotes the maximum percentage a page can be filled before it
+// is split.
 var MaxFillPercent float32 = 0.95

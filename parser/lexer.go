@@ -48,9 +48,9 @@ func (l *Lexer) NextToken() Token {
 			tok.Literal = l.readIdentifier()
 			tok.Type = LookupIdentifier(tok.Literal)
 			return tok
-		} else {
-			tok = newToken(ILLEGAL, l.ch)
 		}
+
+		tok = newToken(ILLEGAL, l.ch)
 	}
 
 	l.readChar()

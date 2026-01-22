@@ -4,19 +4,20 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"orchiddb/globals"
 	"os"
+
+	"orchiddb/globals"
 )
 
-// A write-ahead-log (WAL) is a log detailing the actions that will be commited
+// WAL (write-ahead-log) is a log detailing the actions that will be committed
 // to the database before they happen.
 //
-// In the event of a power loss, if a WAL file is found for a table, it is read
+// In the event of a power loss, if a WAL file is found for a table, it is read,
 // and there is an attempt to replay the logged node update action.
 //
 // When a WAL file is written out, it is stamped with a success marker at the
 // end of the file. If this success marker is not present, then the power loss
-// occurred durring the wal file creation and the intent of the query cannot be
+// occurred during the wal file creation and the intent of the query cannot be
 // determined. If this is the case, the log is discarded and the represented
 // transaction does not happen.
 //
@@ -28,7 +29,7 @@ import (
 // files are only used for recovery.
 //
 // When a transaction commit is attempted, the transaction manager first appends
-// all updated pages to the WAL struct. The stored lsit of pages are logged to
+// all updated pages to the WAL struct. The stored list of pages is logged to
 // the WAL file.
 type WAL struct {
 	pages []*page
@@ -49,27 +50,32 @@ func (w *WAL) appendPage(p *page) {
 }
 
 // WriteLog loops through WAL.pages, serializing them, and then writing them out
-// to path.
+// to the path.
 //
 // When serializing, a success marker is placed at the end of the byte array to
 // be written out. If the bytes could not be successfully written out, there
 // should be no success marker present in the final WAL file.
-func (w *WAL) WriteLog(path string) error {
+func (w *WAL) WriteLog(path string) (err error) {
 	if len(w.pages) == 0 {
-		return fmt.Errorf("WAL has no pages to write.")
+		return fmt.Errorf("WAL has no pages to write")
 	}
 
-	_, err := os.Stat(path)
+	_, err = os.Stat(path)
 	if err == nil {
-		return fmt.Errorf("WAL file for %s already exists!", path)
+		return fmt.Errorf("WAL file for %s already exists", path)
 	}
 
 	walFile, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0o644)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if closeErr := walFile.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
-	var out []byte = []byte{}
+	var out []byte
 	out = append(out, w.serializeWalMetaPage()...)
 	for _, pg := range w.pages {
 		out = append(out, pg.contents...)
@@ -78,13 +84,13 @@ func (w *WAL) WriteLog(path string) error {
 
 	_, err = walFile.WriteAt(out, 0)
 	if err != nil {
-		return fmt.Errorf("unable to write wal to %s", path)
+		return fmt.Errorf("unable to write wal to %s: %w", path, err)
 	}
 
-	return walFile.Close()
+	return nil
 }
 
-// serializeWalMetaPage returns a byte array page contents of the uint64 page
+// serializeWalMetaPage returns a byte array page content of the uint64 page
 // numbers that are in the WAL file.
 // Like all pages, this page beings with a page marker for validity.
 func (w *WAL) serializeWalMetaPage() []byte {
@@ -107,14 +113,19 @@ func (w *WAL) serializeWalMetaPage() []byte {
 // was atomically written.
 //
 // Returns any errors that may have been encountered by std library functions,
-// no custom errors indicating the failed step. If power-loss happened and the
+// no custom errors indicating the failed step. If power-loss happens and the
 // intended action of the user cannot be fully determined, the actions are
-// simply discarded, we do not necessarily care why.
-func RecoverFromLog(path string, pager *Pager) error {
+// simply discarded, and we do not necessarily care why.
+func RecoverFromLog(path string, pager *Pager) (err error) {
 	logFile, err := os.Open(path)
 	if err != nil {
 		return err
 	}
+	defer func() {
+		if closeErr := closeAndRemove(logFile); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
 
 	info, err := logFile.Stat()
 	if err != nil {
@@ -122,8 +133,8 @@ func RecoverFromLog(path string, pager *Pager) error {
 	}
 
 	size := info.Size()
-	if !verifyWalFileSize(size) { // File predicted to contain pages?
-		return closeAndRemove(logFile)
+	if !verifyWalFileSize(size) {
+		return fmt.Errorf("invalid WAL file size")
 	}
 
 	buf := make([]byte, 4)
@@ -132,8 +143,8 @@ func RecoverFromLog(path string, pager *Pager) error {
 		return err
 	}
 
-	if !bytes.Equal(buf, globals.WalSuccessMarker) { // Success marker present?
-		return closeAndRemove(logFile)
+	if !bytes.Equal(buf, globals.WalSuccessMarker) {
+		return fmt.Errorf("WAL file missing success marker")
 	}
 
 	contents := make([]byte, size-4)
@@ -143,10 +154,10 @@ func RecoverFromLog(path string, pager *Pager) error {
 	}
 
 	if err := replayLog(contents, pager); err != nil {
-		return closeAndRemove(logFile)
+		return err
 	}
 
-	return closeAndRemove(logFile)
+	return nil
 }
 
 // Closes the opened *os.File and returns any errors from os.Remove().
@@ -168,14 +179,14 @@ func verifyWalFileSize(size int64) bool {
 		return true
 	}
 
-	// Contents are not aligned with page size.
+	// Contents are not aligned with the page size.
 	return false
 }
 
 // replayLog attempts to write out the changed nodes from a valid WAL file.
 // This process involves getting the page numbers from the first page of the WAL
-// file, and then getting all subsquent page contents in globals.PageSize blocks
-// and recretaing the pages.
+// file, and then getting all later page contents in globals.PageSize blocks
+// and recreating the pages.
 //
 // Recreated pages are written out by pager, and if any error is encountered in
 // the pager writing process, the loop is cut short and the error is returned.
@@ -196,7 +207,7 @@ func replayLog(log []byte, pager *Pager) error {
 		bytesRead = copy(pageContents, log)
 		log = log[bytesRead:] // remove read page contents
 
-		pg := NewEmptyPage(pn)
+		pg := newEmptyPage(pn)
 		pg.contents = pageContents
 		if err := pager.WritePage(pg); err != nil {
 			return err

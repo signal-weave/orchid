@@ -28,19 +28,29 @@ func performRecoveryCheck() {
 
 		db, err := storage.GetTable(t)
 		if err != nil {
-			os.Remove(t)
+			if removeErr := os.Remove(t); removeErr != nil {
+				fmt.Printf("Error removing corrupted table %s: %v\n", t, removeErr)
+			}
 			continue
 		}
 
-		err = storage.RecoverFromLog(walFile, db.Txn.Pager)
-		if err != nil {
-			os.Remove(walFile)
-			msg := fmt.Sprintf("WAL invalid, removing WAL file %s\n", walFile)
-			fmt.Println(msg)
-			db.Close()
-			continue
-		}
+		// Use anonymous func so defer runs per iteration,
+		// not at the function end
+		func() {
+			defer func() {
+				if closeErr := db.Close(); closeErr != nil {
+					fmt.Printf("Error closing table %s: %v\n", tableName, closeErr)
+				}
+			}()
 
-		db.Close()
+			err = storage.RecoverFromLog(walFile, db.Txn.Pager)
+			if err != nil {
+				if removeErr := os.Remove(walFile); removeErr != nil {
+					fmt.Printf("Error removing WAL file %s: %v\n", walFile, removeErr)
+				}
+				fmt.Printf("WAL invalid, removed WAL file %s\n", walFile)
+				return
+			}
+		}()
 	}
 }

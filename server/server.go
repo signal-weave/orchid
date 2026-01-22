@@ -50,7 +50,11 @@ func (server *Server) Run() error {
 
 // Parses the incoming query and sends it to the execution layer.
 func handleConnection(conn net.Conn) {
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			fmt.Printf("Error closing connection: %v\n", err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(conn)
 
@@ -61,7 +65,10 @@ func handleConnection(conn net.Conn) {
 		p := parser.NewParser(l)
 		cmd := p.ParseCommand()
 		if cmd == nil || cmd.Command == nil {
-			io.WriteString(conn, "ERR: parseError\n")
+			if _, err := io.WriteString(conn, "ERR: parseError\n"); err != nil {
+				fmt.Printf("Error writing parse error to client: %v\n", err)
+				return
+			}
 			continue
 		}
 
@@ -71,6 +78,7 @@ func handleConnection(conn net.Conn) {
 		case *parser.GetCommand:
 			t.Conn = conn
 		}
+
 		execution.ExecuteCommand(cmd)
 	}
 

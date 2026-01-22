@@ -7,8 +7,8 @@ import (
 	"orchiddb/globals"
 )
 
-// Items are the actual user inserted data and live in "nodes".
-// Nodes can contain items, and additionally can contain pointers to other nodes
+// Item is the actual user inserted data and live in "nodes".
+// Nodes can contain items and additionally can contain pointers to other nodes
 // that also contain items.
 // The Item is the actual data, but it will always exist in a node.
 // To find items deeper in the structure, the database traverses the housing
@@ -25,13 +25,12 @@ func NewItem(key []byte, value []byte) *Item {
 	}
 }
 
-// Pages can consist of any data, including nodes while nodes are the struct
-// that wraps key-value data in a page and has directions to the next node in
-// the path to the queried data.
+// Node is the page type consisting of the key-value data and directions to the
+// next node in the path to the queried data.
 //
 // The actual user inserted data exists in the node's items.
 //
-// Nodes can contain child nodes, or pointers to nodes in other regions of the
+// Nodes can contain child nodes or pointers to nodes in other regions of the
 // page. We traverse these nodes in B-Tree fashion.
 type Node struct {
 	pageNum    pageNum
@@ -61,10 +60,10 @@ func (n *Node) canSpareAnElement() bool {
 
 // -------Serialization---------------------------------------------------------
 
-// Converts page struct p into a serialized byte array for psersistent storage.
+// Converts page struct p into a serialized byte array for persistent storage.
 func (n *Node) serializeToPage(p *page) {
 	// We use slotted pages for storing data in the page. This means the actual
-	// keys and values (the cells) are appended to right of the page whereas
+	// keys and values (the cells) are appended to the right of the page, whereas
 	// offsets have a fixed size and are appended from the left.
 	// It's easier to preserve the logical order (alphabetical in the case of
 	// b-tree) using the metadata and performing pointer arithmetic. Using the
@@ -205,7 +204,7 @@ func (n *Node) deserializeFromPage(p *page) {
 	}
 }
 
-// -------Size Calulators-------------------------------------------------------
+// -------Size Calculators-------------------------------------------------------
 
 // elementSize returns the size of a key-value-childNode triplet at a given
 // index.
@@ -237,8 +236,8 @@ func (n *Node) nodeSize() int {
 
 // findKeyInNode iterates all the items and finds the key.
 // If the key is found, then the item is returned.
-// If the key isn't found then return the index where it should have been
-// (the first index that key is greater than it's previous).
+// If the key isn't found, then return the index where it should have been
+// (the first index that key is greater than its previous).
 func (n *Node) findKeyInNode(key []byte) (bool, int) {
 	for i, existingItem := range n.items {
 		result := bytes.Compare(existingItem.Key, key)
@@ -246,14 +245,15 @@ func (n *Node) findKeyInNode(key []byte) (bool, int) {
 			return true, i
 		}
 
-		// The key is bigger than the previous key, so it doens't exist in the
-		// node, but may exist in child nodes.
+		// The key is bigger than the previous key, so it doesn't exist in the
+		//  node but may exist in child nodes.
 		if result == 1 {
 			return false, i
 		}
 	}
 
-	// The key isn't bigger than any of the keys which means its in the last idx
+	// The key isn't bigger than any of the other keys; that means it's in the
+	// last idx.
 	return false, len(n.items)
 }
 
@@ -303,34 +303,34 @@ func (n *Node) addItem(item *Item, insertionIndex int) {
 	n.items[insertionIndex] = item
 }
 
-// Does the node require splitting.
+// Does the node require splitting?
 func (n *Node) isOverPopulated() bool {
 	return float32(n.nodeSize()) > n.tbl.options.MaxThreshold
 }
 
-// Does the node require consolidating.
+// Does the node require consolidating?
 func (n *Node) isUnderPopulated() bool {
 	return float32(n.nodeSize()) < n.tbl.options.MinThreshold
 }
 
-// split rebalances the tree after adding. After insertion the modified node has
+// Split rebalances the tree after adding. After insertion the modified node has
 // to be checked to make sure it didn't exceed the maximum number of elements.
 // If it did, then it has to be split and rebalanced. The transformation is
-// depicted in the graph below. If it's not a leaf node, then the children has
+// depicted in the graph below. If it's not a leaf node, then the children have
 // to be moved as well as shown.
-// This may leave the parent unbalanced by having too many items so rebalancing
+// This may leave the parent unbalanced by having too many items, so rebalancing
 // has to be checked for all the ancestors.
 // The split is performed in a for loop to support splitting a node more than
 // once. (Though in practice used only once).
 //
-//		           n                                        n
+//		           N                                        n
 //	                3                                       3,6
 //		      /        \           ------>       /          |          \
 //		   a           modifiedNode            a       modifiedNode     newNode
 //	  1,2                 4,5,6,7,8            1,2          4,5         7,8
 func (n *Node) split(nodeToSplit *Node, nodeToSplitIndex int) {
-	// The first index wehree min amount of bytes to populate a page is
-	// achieved. Then add 1 so it will be split one index after.
+	// The first index where min number of bytes to populate a page is achieved.
+	// Then add 1 so it is split one index after.
 	splitIndex := nodeToSplit.tbl.getSplitIndex(nodeToSplit)
 
 	middleItem := nodeToSplit.items[splitIndex]
@@ -353,7 +353,7 @@ func (n *Node) split(nodeToSplit *Node, nodeToSplitIndex int) {
 	n.addItem(middleItem, nodeToSplitIndex)
 
 	if len(n.childNodes) == nodeToSplitIndex+1 {
-		// If middle of list, then move items forward
+		// If middle of a list, then move items forward
 		n.childNodes = append(n.childNodes, newNode.pageNum)
 	} else {
 		n.childNodes = append(
@@ -374,7 +374,7 @@ func (n *Node) removeItemFromLeaf(index int) {
 }
 
 func (n *Node) removeItemFromInternal(index int) ([]int, error) {
-	// Take element before inorder (The biggest element from the left branch),
+	// Take the element before inorder (The biggest element from the left branch),
 	// put it in the removed index and remove it from the original node. Track
 	// in affectedNodes any nodes in the path leading to that node. It will be
 	// used in case the tree needs to be rebalanced.
@@ -440,13 +440,13 @@ func (n *Node) merge(bNode *Node, bNodeIndex int) error {
 	return nil
 }
 
-// rebalanceRemove rebalances the tree after a remove operation.
+// rebalanceRemove will rebalance the tree after a remove operation.
 // This can be either by rotating to the right, to the left or by merging.
 // First, the sibling nodes are checked to see if they have enough items for
 // rebalancing (>= minItems+1).
 // If they don't have enough items, then merging with one of the sibling nodes
 // occurs.
-// This may leave the parent unbalanced by having too little items so
+// This may leave the parent unbalanced by having too few items, so
 // rebalancing has to be checked for all the ancestors.
 func (n *Node) reblanceRemove(unbalancedNode *Node, unbalanacedNodeIndex int) error {
 	pNode := n
@@ -479,7 +479,7 @@ func (n *Node) reblanceRemove(unbalancedNode *Node, unbalanacedNodeIndex int) er
 	// The merge function merges a given node with its node to the right. So by
 	// default, we merge an unbalanced node with its right sibling. In the case
 	// where the unbalanced node is the leftmost, we have to replace the merge
-	// parameters, so the unbalanced node right sibling, will be merged into the
+	// parameters, so the unbalanced node's right sibling will be merged into the
 	// unbalanced node.
 	if unbalanacedNodeIndex == 0 {
 		rightNode, err := n.tbl.GetNode(n.childNodes[unbalanacedNodeIndex+1])
@@ -512,7 +512,7 @@ func rotateRight(aNode, pNode, bNode *Node, bNodeIndex int) {
 	pNodeItem := pNode.items[pNodeItemIndex]
 	pNode.items[pNodeItemIndex] = aNodeItem
 
-	// Assign parent item to b and make it first.
+	// Assign a parent item to b and make it first.
 	bNode.items = append([]*Item{pNodeItem}, bNode.items...)
 
 	// If it's an inner leaf, then move children as well.
@@ -530,7 +530,7 @@ func rotateLeft(aNode, pNode, bNode *Node, bNodeIndex int) {
 	//  a(unbalanced)       b                 a(unbalanced)        b
 	//   1                3,4,5                   1,2             4,5
 
-	// Get first item and remove it
+	// Get the first item and remove it
 	bNodeItem := bNode.items[0]
 	bNode.items = bNode.items[1:]
 

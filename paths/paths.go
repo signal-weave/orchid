@@ -14,7 +14,7 @@ import (
 
 // -------Database Paths--------------------------------------------------------
 
-// The directory the program is running from.
+// GetExecDirectory gets the directory the program is running from.
 func GetExecDirectory() string {
 	exePath, err := os.Executable()
 	if err != nil {
@@ -25,13 +25,13 @@ func GetExecDirectory() string {
 	return exeDir
 }
 
-// The directory the .exe file is ran from.
-// Used as default DatabasePath if one is not provided.
+// ExeDir gets the directory the .exe file is run from.
+// Used as the default DatabasePath if one is not provided.
 var ExeDir = GetExecDirectory()
 
-// Where the currently loaded database files are located. This can be set
-// through CLI but will default to the .exe's directory.
-var DatabasePath string = ExeDir
+// DatabasePath is where the currently loaded database files are located.
+// This can be set through CLI but will default to the .exe's directory.
+var DatabasePath = ExeDir
 
 // GetTablePath returns the path to the .db file for tbl.
 func GetTablePath(tbl string) (string, bool) {
@@ -65,14 +65,14 @@ func GetTableWAL(tbl string) (string, bool) {
 	return "", false
 }
 
-// Returns a list of absolute paths to the table .db files.
+// GetTablePaths returns a list of absolute paths to the table .db files.
 func GetTablePaths() []string {
 	items, err := GetDirContents(DatabasePath)
 	if err != nil {
 		return nil
 	}
 
-	tables := []string{}
+	var tables []string
 
 	for _, item := range items {
 		if strings.HasSuffix(item, globals.TBL_SUFFIX) {
@@ -87,7 +87,7 @@ func GetTablePaths() []string {
 
 // GetDirContents returns all items in path or encountered error.
 func GetDirContents(path string) ([]string, error) {
-	var contents []string = []string{}
+	var contents []string
 
 	items, err := os.ReadDir(path)
 	if err != nil {
@@ -106,7 +106,7 @@ type PathLike interface {
 	~string | *os.File
 }
 
-// GetStemFromString returns the file stem of a string path or *os.File.
+// GetStem returns the file stem of a string path or *os.File.
 // E.g. "V:/dir/file.txt" becomes "file".
 func GetStem[T PathLike](v T) (string, error) {
 	var base string

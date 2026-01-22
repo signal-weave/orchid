@@ -15,7 +15,7 @@ const metaPage = 0
 // using the space of a freed page or allocating a new one.
 type freelist struct {
 	// Holds the maximum page allocated. maxpage*pageSize = filesize
-	// (excluding the freelist page and meta page).
+	// (excluding the freelist page and meta-page).
 	MaxPage pageNum
 
 	// Pages that were previously allocated but are now free
@@ -31,9 +31,9 @@ func newFreelist() *freelist {
 
 // -------Page Management-------------------------------------------------------
 
-// getNextPage returns page ids for writing.
+// GetNextPage returns page ids for writing.
 // New page ids are first given from the releasedPageIDs to avoid growing the
-// file. If it's empty, then maxPage is incremented and a new page is created
+// file. If it's empty, then maxPage is incremented and a new page is created,
 // thus increasing the file size.
 func (fr *freelist) GetNextPage() pageNum {
 	// Take the last element and remove it from the list
@@ -55,7 +55,7 @@ func (fr *freelist) ReleasePage(page pageNum) {
 
 // serializeToPage writes the freelist's contents into page p.
 func (fr *freelist) serializeToPage() *page {
-	p := NewEmptyPage(FreelistPageNum)
+	p := newEmptyPage(FreelistPageNum)
 	pos := 0
 
 	// Page marker

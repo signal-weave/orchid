@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// Capture a stable anchor at process start.
+// Capture a stable anchor at the process start.
 var (
 	processStartWallUTC = time.Now().UTC() // wall clock snapshot
 	processStartMono    = time.Now()       // carries monotonic reading
@@ -43,7 +43,7 @@ func FileStamp() string {
 	return string(safe) + "-" + fmt.Sprintf("%04s", leftPad(strconv.FormatUint(n, 10), 4, '0'))
 }
 
-// FileName builds "<stem>_<stamp><suffix>" with the stable timestamp.
+// FileNameMonotonic builds "<stem>_<stamp><suffix>" with the stable timestamp.
 // e.g. ("FileName", ".log") will give
 // FileName_2025-09-14T22-11-33.123456789Z-0001.log
 func FileNameMonotonic(stem, suffix string) string {
