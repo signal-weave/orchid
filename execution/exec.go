@@ -13,16 +13,16 @@ import (
 
 // -------Worker Handling-------------------------------------------------------
 
-// Map of table names to their respective worker.
+// LoadedWorkers is a map of table names to their respective worker.
 var LoadedWorkers map[string]*TableWorker = map[string]*TableWorker{}
 
 func CloseAllTables() {
-    for name, w := range LoadedWorkers {
-        w.Stop()
-        if err := w.Close(); err != nil {
-            fmt.Println("close error for", name, ":", err)
-        }
-    }
+	for name, w := range LoadedWorkers {
+		w.Stop()
+		if err := w.Close(); err != nil {
+			fmt.Println("close error for", name, ":", err)
+		}
+	}
 }
 
 func PrintWorkers() {
@@ -34,7 +34,7 @@ func PrintWorkers() {
 }
 
 // ExecuteCommand executes the corresponding function for the given cmd.
-// Relies on cmd.Command.Table to get table to make/drop or to get corresponding
+// Relies on cmd.Command.Table to get table to make/drop or to get the corresponding
 // worker to process GET, PUT, DEL, etc.
 func ExecuteCommand(cmd *parser.Command) {
 	switch t := cmd.Command.(type) {
@@ -55,7 +55,7 @@ func ExecuteCommand(cmd *parser.Command) {
 
 // -------Commands--------------------------------------------------------------
 
-// makeTable creates cmd.Table if it does not already exists.
+// makeTable creates cmd.Table if it does not already exist.
 // Will spawn and register a worker for the table.
 func makeTable(cmd *parser.MakeCommand) {
 	tblName := cmd.Table
@@ -76,7 +76,7 @@ func makeTable(cmd *parser.MakeCommand) {
 }
 
 // dropTable stops and unloads the cmd.Table's worker and removes the .db file
-// from disk.
+// from the disk.
 func dropTable(cmd *parser.DropCommand) {
 	worker, exists := LoadedWorkers[cmd.Table]
 	if !exists {

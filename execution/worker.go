@@ -7,13 +7,12 @@ import (
 	"orchiddb/storage"
 )
 
-// A "TableWorker" is a struct that runs a loop over a channel on a goroutine.
+// TableWorker is a struct that runs a loop over a channel on a goroutine.
 // The worker is the primary interface to the underlying table allowing each
 // table the io capabilities of a separate OS thread.
 // This means Orchid will have n threads where n is the number of active
 // tables.
 type TableWorker struct {
-	// Replace with type to receive. Must be pointer, but to any type.
 	in chan *parser.Command
 
 	tbl    *storage.Table
