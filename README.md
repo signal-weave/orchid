@@ -11,7 +11,7 @@ Orchid is a simple Key Value database written in Go.
      `Y8bood8P'  d888b    `Y8bod8P' o888o o888o o888o `Y8bod88P'    o888bood8P'   o888bood8P'
 ```
 
-Orchid is a work in progress KV database.
+Orchid is a work-in-progress KV database.
 
 ## Query Language
 
@@ -20,6 +20,9 @@ Orchid is a work in progress KV database.
 * `GET(table, key)`
 * `PUT(table, key, value)`
 * `DEL(table, key)`
+* `STOP()`
+
+Queries are read in through the port.
 
 ## Runtime Options (CLI)
 	
