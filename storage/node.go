@@ -324,7 +324,7 @@ func (n *Node) isUnderPopulated() bool {
 // once. (Though in practice used only once).
 //
 //		           N                                        n
-//	                3                                       3,6
+//	               3                                       3,6
 //		      /        \           ------>       /          |          \
 //		   a           modifiedNode            a       modifiedNode     newNode
 //	  1,2                 4,5,6,7,8            1,2          4,5         7,8
@@ -413,7 +413,7 @@ func (n *Node) removeItemFromInternal(index int) ([]int, error) {
 
 func (n *Node) merge(bNode *Node, bNodeIndex int) error {
 	// 	               p                                     p
-	//                    3,5                                    5
+	//                3,5                                    5
 	//	      /        |       \       ------>         /          \
 	//      a          b        c                     a            c
 	//     1,2         4        6,7                 1,2,3,4         6,7
@@ -495,7 +495,7 @@ func (n *Node) reblanceRemove(unbalancedNode *Node, unbalanacedNodeIndex int) er
 
 func rotateRight(aNode, pNode, bNode *Node, bNodeIndex int) {
 	// 	           p                                    p
-	//                 4                                    3
+	//             4                                    3
 	//	      /        \           ------>         /          \
 	//	   a           b (unbalanced)            a        b (unbalanced)
 	//      1,2,3             5                     1,2            4,5
@@ -525,7 +525,7 @@ func rotateRight(aNode, pNode, bNode *Node, bNodeIndex int) {
 
 func rotateLeft(aNode, pNode, bNode *Node, bNodeIndex int) {
 	// 	           p                                     p
-	//                 2                                     3
+	//             2                                     3
 	//	      /        \           ------>         /          \
 	//  a(unbalanced)       b                 a(unbalanced)        b
 	//   1                3,4,5                   1,2             4,5
