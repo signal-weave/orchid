@@ -74,9 +74,13 @@ func handleConnection(conn net.Conn) {
 
 		fmt.Println("parsed command:", cmd.Command.String())
 
+		// Handle non-storage engine commands here.
 		switch t := cmd.Command.(type) {
 		case *parser.GetCommand:
 			t.Conn = conn
+		case *parser.StopCommand:
+			globals.PerformShutdown = true
+			return
 		}
 
 		execution.ExecuteCommand(cmd)

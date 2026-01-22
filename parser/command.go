@@ -30,6 +30,17 @@ type Identifier struct {
 func (i *Identifier) TokenLiteral() string { return i.Token.Literal }
 func (i *Identifier) String() string       { return i.Value }
 
+// -------STOP Command----------------------------------------------------------
+
+// StopCommand represents user intent to stop the server.
+type StopCommand struct {
+	Token Token // the 'STOP' keyword token
+}
+
+func (sc *StopCommand) TokenLiteral() string { return sc.Token.Literal }
+func (sc *StopCommand) String() string       { return "STOP" }
+func (sc *StopCommand) GetTable() string     { return "" }
+
 // -------MAKE Command----------------------------------------------------------
 
 // MakeCommand represents user intent to create a new table.

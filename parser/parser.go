@@ -7,9 +7,7 @@ import (
 	"orchiddb/globals"
 )
 
-type (
-	parseCmdFn func() Node
-)
+type parseCmdFn func() Node
 
 // Parser is the primary token parsing engine.
 // Contains a lexer that will lex a byte stream, creating an array of tokens.
@@ -32,6 +30,7 @@ func NewParser(l *Lexer) *Parser {
 	}
 
 	p.parseFunctions = make(map[TokenType]parseCmdFn)
+	p.registerParseFn(STOP, p.paseStopCommand)
 	p.registerParseFn(MAKE, p.parseMakeCommand)
 	p.registerParseFn(DROP, p.parseDropCommand)
 	p.registerParseFn(GET, p.parseGetCommand)
@@ -73,15 +72,19 @@ func (p *Parser) ParseCommand() *Command {
 
 // -------Token Handling--------------------------------------------------------
 
+// nextToken sets curToken to the peekToken and moves the peekToken forward by one.
 func (p *Parser) nextToken() {
 	p.curToken = p.peekToken
 	p.peekToken = p.l.NextToken()
 }
 
+// peekTokenIs checks if the peekToken is of the given type.
 func (p *Parser) peekTokenIs(t TokenType) bool {
 	return p.peekToken.Type == t
 }
 
+// expectPeek checks if the peekToken is of the given type, and if so, moves the
+// peekToken forward by one.
 func (p *Parser) expectPeek(t TokenType) bool {
 	if p.peekTokenIs(t) {
 		p.nextToken()
@@ -129,6 +132,19 @@ func (p *Parser) missingNextArg(argName, cmd string) bool {
 		return true
 	}
 	return false
+}
+
+func (p *Parser) paseStopCommand() Node {
+	cmd := &StopCommand{Token: p.curToken}
+
+	if !p.expectPeek(LPAREN) {
+		return nil
+	}
+	if !p.expectPeek(RPAREN) {
+		return nil
+	}
+
+	return cmd
 }
 
 func (p *Parser) parseMakeCommand() Node {

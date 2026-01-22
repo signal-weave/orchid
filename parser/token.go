@@ -27,6 +27,8 @@ const (
 
 	DROP = "DROP"
 	MAKE = "MAKE"
+
+	STOP = "STOP"
 )
 
 var keywords = map[string]TokenType{
@@ -36,6 +38,8 @@ var keywords = map[string]TokenType{
 
 	"MAKE": MAKE, // MAKE(table)
 	"DROP": DROP, // DROP(table)
+
+	"STOP": STOP, // STOP()
 }
 
 func LookupIdentifier(ident string) TokenType {
